@@ -34,10 +34,10 @@ func (t *Database) New(connString string) (error) {
 
 // ConnString returns a connection string based on the parameters it's given
 // This would normally also contain the password, however we're not using one
-func (t *Database) ConnString(host string, port int, user string, password string, dbName string) string {
+func (t *Database) ConnString(host string, port int, user string, password string, dbName string, searchPath string) string {
 	return fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=require",
-		host, port, user, password, dbName,
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=require search_path=%s",
+		host, port, user, password, dbName, searchPath,
 	)
 }
 

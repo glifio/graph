@@ -52,7 +52,7 @@ func init() {
 
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringP("port", "p", "9111", "port number (default is 9111)")
+	// rootCmd.PersistentFlags().StringP("port", "p", "9111", "port number (default is 9111)")
 	// rootCmd.PersistentFlags().String("db-host", "", "port number (default is 9111)")
 	// rootCmd.PersistentFlags().String("db-port", "", "port number (default is 9111)")
 	// rootCmd.PersistentFlags().String("db-user", "", "port number (default is 9111)")
@@ -60,13 +60,15 @@ func init() {
 	// rootCmd.PersistentFlags().String("db-database", "", "port number (default is 9111)")
 	// rootCmd.PersistentFlags().String("lotus-token", "", "port number (default is 9111)")
 	// rootCmd.PersistentFlags().String("lotus-address", "", "port number (default is 9111)")
-	viper.BindPFlag("port", rootCmd.PersistentFlags().Lookup("port"))
+	// viper.BindPFlag("port", rootCmd.PersistentFlags().Lookup("port"))
 	//viper.BindPFlag("db-host", rootCmd.PersistentFlags().Lookup("db-host"))
+	viper.BindEnv("port")
 	viper.BindEnv("db_host")
 	viper.BindEnv("db_port")
 	viper.BindEnv("db_user")
 	viper.BindEnv("db_password")
 	viper.BindEnv("db_database")
+	viper.BindEnv("db_schema")
 	viper.BindEnv("lotus_token")
 	viper.BindEnv("lotus_addr")
 

@@ -15,6 +15,7 @@ type Config struct {
 	DbUser       	string        `mapstructure:"DB_USER"`
 	DbPassword     	string        `mapstructure:"DB_PASSWORD"`
 	DbDatabase     	string        `mapstructure:"DB_DATABASE"`
+	DbSchema     	string        `mapstructure:"DB_SCHEMA"`
 	LotusToken  	string        `mapstructure:"LOTUS_TOKEN"`
 	LotusAddress  	string        `mapstructure:"LOTUS_ADDR"`
 }

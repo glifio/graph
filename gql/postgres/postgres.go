@@ -98,7 +98,7 @@ func GetUsersByName(name string) []User {
 // GetMessages 
 func GetMessages() []*model.Message {
 	// Prepare query, takes a name argument, protects from sql injection
-	stmt, err := Db.Prepare("select m.cid, m.height, m.from, m.to, m.value, m.method, m.params from visor.parsed_messages m limit 10")
+	stmt, err := Db.Prepare("select m.cid, m.height, m.from, m.to, m.value, m.method, m.params from parsed_messages m limit 10")
 	if err != nil {
 		fmt.Println("GetMessages Preperation Err: ", err)
 	}
@@ -137,7 +137,7 @@ func GetMessages() []*model.Message {
 // GetMessagesFrom 
 func GetMessagesFrom(address string) []*model.Message {
 	// Prepare query, takes a name argument, protects from sql injection
-	stmt, err := Db.Prepare("select m.cid, m.height, m.from, m.to, m.value, m.method, m.params from visor.parsed_messages m where m.from = $1 limit 100")
+	stmt, err := Db.Prepare("select m.cid, m.height, m.from, m.to, m.value, m.method, m.params from parsed_messages m where m.from = $1 limit 100")
 	if err != nil {
 		fmt.Println("GetMessagesFrom Preperation Err: ", err)
 	}
@@ -177,7 +177,7 @@ func GetMessagesFrom(address string) []*model.Message {
 // GetMessagesFrom 
 func GetMessagesTo(address string) []*model.Message {
 	// Prepare query, takes a name argument, protects from sql injection
-	stmt, err := Db.Prepare("select m.cid, m.height, m.from, m.to, m.value, m.method, m.params from visor.parsed_messages m where m.to = $1 limit 100")
+	stmt, err := Db.Prepare("select m.cid, m.height, m.from, m.to, m.value, m.method, m.params from parsed_messages m where m.to = $1 limit 100")
 	if err != nil {
 		fmt.Println("GetMessagesTo Preperation Err: ", err)
 	}

@@ -18,7 +18,7 @@ func (t *Message) Init(db Database) error {
 
 func (t *Message) Get(id string) (*lily.MessageItem, error) {
 	// Prepare query, takes a name argument, protects from sql injection
-	stmt, err := t.db.Db.Prepare("select m.id, m.code, m.head, m.nonce, m.balance, m.state_root, m.height from visor.actors m where m.id = $1")
+	stmt, err := t.db.Db.Prepare("select m.id, m.code, m.head, m.nonce, m.balance, m.state_root, m.height from actors m where m.id = $1")
 	if err != nil {
 		fmt.Println("Get Actor Preperation Err: ", err)
 	}
@@ -43,12 +43,12 @@ func (t *Message) Get(id string) (*lily.MessageItem, error) {
 
 func (t *Message) List(limit int, offset int) ([]lily.MessageItem, error) {
 	// Prepare query, takes a name argument, protects from sql injection
-	// stmt, err := t.db.Db.Prepare("select m.cid, m.height, m.from, m.to, m.value, m.method, m.params from visor.parsed_messages m limit 5 offset $2")
+	// stmt, err := t.db.Db.Prepare("select m.cid, m.height, m.from, m.to, m.value, m.method, m.params from parsed_messages m limit 5 offset $2")
 	// if err != nil {
 	// 	fmt.Println("GetMessages Preperation Err: ", err)
 	// }
 
-	rows, err := t.db.Db.Query("select m.cid, m.height, m.from, m.to, m.value, m.method, m.params from visor.parsed_messages m limit $1 offset $2", limit, offset)
+	rows, err := t.db.Db.Query("select m.cid, m.height, m.from, m.to, m.value, m.method, m.params from parsed_messages m limit $1 offset $2", limit, offset)
 	// Make query with our stmt
 	//rows, err := stmt.Query(offset)
 	if err != nil {

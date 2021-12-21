@@ -18,7 +18,7 @@ func (t *Actor) Init(db Database) error {
 
 func (t *Actor) Get(id string) (*lily.ActorItem, error) {
 	// Prepare query, takes a name argument, protects from sql injection
-	stmt, err := t.db.Db.Prepare("select m.id, m.code, m.head, m.nonce, m.balance, m.state_root, m.height from visor.actors m where m.id = $1")
+	stmt, err := t.db.Db.Prepare("select m.id, m.code, m.head, m.nonce, m.balance, m.state_root, m.height from actors m where m.id = $1")
 	if err != nil {
 		fmt.Println("Get Actor Preperation Err: ", err)
 	}
@@ -43,7 +43,7 @@ func (t *Actor) Get(id string) (*lily.ActorItem, error) {
 
 func (t *Actor) List() ([]lily.ActorItem, error) {
 	// Prepare query, takes a name argument, protects from sql injection
-	stmt, err := t.db.Db.Prepare("select m.id, m.code, m.head, m.nonce, m.balance, m.state_root, m.height from visor.actors m limit 5")
+	stmt, err := t.db.Db.Prepare("select m.id, m.code, m.head, m.nonce, m.balance, m.state_root, m.height from actors m limit 5")
 	if err != nil {
 		fmt.Println("Get Actors Preperation Err: ", err)
 	}

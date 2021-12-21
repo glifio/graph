@@ -31,7 +31,7 @@ var daemonCmd = &cobra.Command{
 	// Create a new connection to our pg database
 	var db postgres.Database
 	err = db.New(
-		db.ConnString(config.DbHost, config.DbPort, config.DbUser, config.DbPassword, config.DbDatabase),
+		db.ConnString(config.DbHost, config.DbPort, config.DbUser, config.DbPassword, config.DbDatabase, config.DbSchema),
 	)
 	if err != nil {
 		log.Fatal(err)
