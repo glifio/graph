@@ -1,0 +1,200 @@
+package graph
+
+// This file will be automatically regenerated based on the schema, any resolver implementations
+// will be copied through when generating and any unknown code will be moved to the end.
+
+import (
+	"context"
+	"fmt"
+	"math/rand"
+	"strconv"
+
+	"github.com/glifio/graph/gql/generated"
+	"github.com/glifio/graph/gql/model"
+	"github.com/glifio/graph/pkg/lily"
+)
+
+func (r *messageResolver) To(ctx context.Context, obj *model.Message) (*model.Actor, error) {
+	address := obj.To
+	item, err := r.NodeService.GetActor(address)
+	if err != nil {
+		return nil, err
+	} else {
+		return &model.Actor{
+			ID:   address,
+			Code: item.Code.String(),
+			Head: item.Head.String(),
+			// StateRoot: item.StateRoot,
+			// Nonce:     item.Nonce,
+			// Height:    item.Height,
+			Balance: item.Balance.String(),
+		}, nil
+	}
+
+	//return &model.Actor{ID: obj.To, Code: "user1 " + obj.Cid}, nil
+}
+
+func (r *messageResolver) From(ctx context.Context, obj *model.Message) (*model.Actor, error) {
+	address := obj.From
+	item, err := r.NodeService.GetActor(address)
+	if err != nil {
+		return nil, err
+	} else {
+		return &model.Actor{
+			ID:   address,
+			Code: item.Code.String(),
+			Head: item.Head.String(),
+			// StateRoot: item.StateRoot,
+			// Nonce:     item.Nonce,
+			// Height:    item.Height,
+			Balance: item.Balance.String(),
+		}, nil
+	}
+}
+
+func (r *mutationResolver) CreateTodo(ctx context.Context, input model.NewTodo) (*model.Todo, error) {
+	todo := &model.Todo{
+		Text:   input.Text,
+		ID:     fmt.Sprintf("T%d", rand.Int()),
+		UserID: input.UserID,
+	}
+	r.todos = append(r.todos, todo)
+	return todo, nil
+}
+
+func (r *queryResolver) Todos(ctx context.Context) ([]*model.Todo, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+
+func (r *queryResolver) Messages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.Message, error) {
+	//return postgres.GetMessages(), nil
+	var items []*model.Message
+	var savedItems []lily.MessageItem
+	savedItems, err := r.MessageService.List(*limit, *offset)
+	if err != nil {
+		return nil, err
+	}
+	for i, savedItem := range savedItems {
+		var item model.Message
+		savedItem = savedItems[i]
+		item.Cid = savedItem.Cid
+		item.Height = savedItem.Height
+		item.From = savedItem.From
+		item.To = savedItem.To
+		item.Value = savedItem.Value
+		item.Method = savedItem.Method
+		item.Params = savedItem.Params
+		items = append(items, &item)
+	}
+	return items, nil
+}
+
+func (r *queryResolver) PendingMessages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.Message, error) {
+	var items []*model.Message
+	pending, err := r.NodeService.GetPendingMessages(*address)
+	if err != nil {
+		return nil, err
+	}
+	for i, item := range pending {
+		var msg model.Message
+		msg.Cid = item[i].Cid.String()
+		m, err := r.NodeService.GetMessage(msg.Cid)
+		if err != nil {
+			msg.To = m.To.String()
+			msg.Method = m.Method.String()
+			*msg.GasFeeCap = m.GasFeeCap.String()
+			*msg.GasLimit = strconv.FormatInt(m.GasLimit, 64)
+		}
+		fmt.Println(item[i].Cid)
+		items = append(items, &msg)
+	}
+	return items, nil
+}
+
+func (r *queryResolver) Actor(ctx context.Context, address string) (*model.Actor, error) {
+	item, err := r.NodeService.GetActor(address)
+	if err != nil {
+		return nil, err
+	} else {
+		return &model.Actor{
+			ID:   address,
+			Code: item.Code.String(),
+			Head: item.Head.String(),
+			// StateRoot: item.StateRoot,
+			// Nonce:     item.Nonce,
+			// Height:    item.Height,
+			Balance: item.Balance.String(),
+		}, nil
+	}
+}
+
+func (r *queryResolver) Actors(ctx context.Context) ([]*model.Actor, error) {
+	panic(fmt.Errorf("not implemented"))
+
+	// var items []*model.Actor
+	// var savedItems []lily.ActorItem
+	// savedItems, err := r.ActorService.List()
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// for i, savedItem := range savedItems {
+	// 	var item model.Actor
+	// 	savedItem = savedItems[i]
+	// 	item.ID = savedItem.ID
+	// 	item.Code = savedItem.Code
+	// 	item.Head = savedItem.Head
+	// 	item.StateRoot = savedItem.StateRoot
+	// 	item.Nonce = savedItem.Nonce
+	// 	item.Balance = savedItem.Balance
+	// 	item.Height = savedItem.Height
+	// 	items = append(items, &item)
+	// }
+	// return items, nil
+}
+
+func (r *todoResolver) User(ctx context.Context, obj *model.Todo) (*model.User, error) {
+	return &model.User{ID: obj.UserID, Name: "user " + obj.UserID}, nil
+}
+
+func (r *todoResolver) Actor(ctx context.Context, obj *model.Todo) (*model.Actor, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+
+// Message returns generated.MessageResolver implementation.
+func (r *Resolver) Message() generated.MessageResolver { return &messageResolver{r} }
+
+// Mutation returns generated.MutationResolver implementation.
+func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
+
+// Query returns generated.QueryResolver implementation.
+func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
+
+// Todo returns generated.TodoResolver implementation.
+func (r *Resolver) Todo() generated.TodoResolver { return &todoResolver{r} }
+
+type messageResolver struct{ *Resolver }
+type mutationResolver struct{ *Resolver }
+type queryResolver struct{ *Resolver }
+type todoResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//    it when you're done.
+//  - You have helper methods in this file. Move them out to keep these resolver files clean.
+func (r *messageResolver) Version(ctx context.Context, obj *model.Message) (*int, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+func (r *messageResolver) Nonce(ctx context.Context, obj *model.Message) (*string, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+func (r *messageResolver) GasLimit(ctx context.Context, obj *model.Message) (*string, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+func (r *messageResolver) GasFeeCap(ctx context.Context, obj *model.Message) (*string, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+func (r *messageResolver) GasPremium(ctx context.Context, obj *model.Message) (*string, error) {
+	panic(fmt.Errorf("not implemented"))
+}

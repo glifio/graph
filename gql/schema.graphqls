@@ -1,0 +1,83 @@
+# GraphQL schema glif graph
+#
+# https://gqlgen.com/getting-started/
+
+type Query {
+  todos: [Todo!]!
+  messages(address: String, limit: Int = 5, offset: Int = 0): [Message!]!
+  pendingMessages(address: String, limit: Int = 5, offset: Int = 0): [Message!]!
+  #address(str: String!): Address
+  actor(address: String!): Actor
+  actors: [Actor!]!
+}
+
+type Mutation {
+  createTodo(input: NewTodo!): Todo!
+}
+
+# Units of height
+enum FilUnit {
+  Fil
+  AttoFil
+  FemtoFil
+  PicoFil
+  NanoFil
+}
+
+type Todo {
+  id: ID!
+  text: String!
+  done: Boolean!
+  user: User!
+  actor: Actor!
+}
+
+type Message {
+  cid: String!
+  version: Int
+  to: Actor!
+  from: Actor!
+  Nonce: String
+  #value(unit: FilUnit = AttoFil): Float!
+  value: Float!
+  GasLimit: String
+  GasFeeCap: String
+  GasPremium: String
+  method: String!
+  height: Float!
+  params: String
+}
+
+type Address {
+  id: ID!
+  str: String!
+  actor: Actor!
+}
+
+type Actor {
+  id: ID!
+  Code: String!
+  Head: String!
+  Nonce: String!
+  Balance(unit: FilUnit = AttoFil): String!
+  StateRoot: String!
+  Height: String!
+}
+
+type User {
+  id: ID!
+  name: String!
+}
+
+type QueryMessage {
+  messages: [Message!]!
+}
+
+type QueryUser {
+  users: [User!]!
+}
+
+input NewTodo {
+  text: String!
+  userId: String!
+}
