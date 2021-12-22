@@ -13,6 +13,8 @@ import (
 	util "github.com/glifio/graph/internal/utils"
 	"github.com/glifio/graph/pkg/node"
 	"github.com/glifio/graph/pkg/postgres"
+	"github.com/go-chi/chi"
+	"github.com/rs/cors"
 	"github.com/spf13/cobra"
 )
 
@@ -47,12 +49,22 @@ var daemonCmd = &cobra.Command{
 	messageService := &postgres.Message{}
 	messageService.Init(db)
 
+	router := chi.NewRouter()
+
+	// Add CORS middleware around every request
+	// See https://github.com/rs/cors for full option listing
+	router.Use(cors.New(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowCredentials: true,
+		Debug:            true,
+	}).Handler)
+
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &graph.Resolver{NodeService: nodeService, MessageService: messageService}}))
 
-	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
-	http.Handle("/query", srv)
+	router.Handle("/", playground.Handler("GraphQL playground", "/query"))
+	router.Handle("/query", srv)
 
 	log.Printf("connect to http://localhost:%d/ for GraphQL playground", config.Port)
-	log.Fatal(http.ListenAndServe(":" + strconv.Itoa(config.Port), nil))
+	log.Fatal(http.ListenAndServe(":" + strconv.Itoa(config.Port), router))
   },
 }
