@@ -16,6 +16,7 @@ import (
 type NodeInterface interface {
 	GetActor(id string) (*types.Actor, error)
 	GetPendingMessages(id string) ([][]lotusapi.MessageCheckStatus, error)
+	GetPending() ([]*types.SignedMessage, error)
 	GetMessage(cidcc string) (*types.Message, error)
 }
 
@@ -86,6 +87,20 @@ func (t *Node) GetPendingMessages(id string) ([][]lotusapi.MessageCheckStatus, e
 	
 	status, err := t.api.MpoolCheckPendingMessages(context.Background(), addr)
 	//status, err := t.api.MpoolCheckMessages(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+	return status, nil
+}
+
+func (t *Node) GetPending() ([]*types.SignedMessage, error) {
+
+	tipset, err := t.api.ChainHead(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+	
+	status, err := t.api.MpoolPending(context.Background(), tipset.Key())
 	if err != nil {
 		log.Fatal(err)
 	}

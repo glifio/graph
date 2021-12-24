@@ -2,10 +2,23 @@
 #
 # https://gqlgen.com/getting-started/
 
+scalar Int64
+scalar Uint64
+
 type Query {
   todos: [Todo!]!
+  message(cid: String): MessageConfirmed!
   messages(address: String, limit: Int = 5, offset: Int = 0): [Message!]!
-  pendingMessages(address: String, limit: Int = 5, offset: Int = 0): [Message!]!
+  pendingMessages(
+    address: String
+    limit: Int = 5
+    offset: Int = 0
+  ): [MessagePending!]! #mempool
+  messagesConfirmed(
+    address: String
+    limit: Int = 5
+    offset: Int = 0
+  ): [MessageConfirmed!]! # lily
   #address(str: String!): Address
   actor(address: String!): Actor
   actors: [Actor!]!
@@ -13,6 +26,10 @@ type Query {
 
 type Mutation {
   createTodo(input: NewTodo!): Todo!
+}
+
+type Subscription {
+  messages: [Message!]
 }
 
 # Units of height
@@ -37,20 +54,65 @@ type Message {
   version: Int
   to: Actor!
   from: Actor!
-  Nonce: String
+  nonce: String
   #value(unit: FilUnit = AttoFil): Float!
   value: Float!
-  GasLimit: String
-  GasFeeCap: String
-  GasPremium: String
+  gasLimit: String
+  gasFeeCap: String
+  gasPremium: String
   method: String!
   height: Float!
   params: String
 }
 
+type MessagePending {
+  cid: String!
+  version: Int
+  to: Address!
+  from: Address!
+  nonce: String
+  #value(unit: FilUnit = AttoFil): Float!
+  value: Float!
+  gasLimit: String
+  gasFeeCap: String
+  gasPremium: String
+  method: String!
+  height: Float!
+  params: String
+}
+
+type MessageConfirmed {
+  cid: String!
+  height: Int64!
+  stateRoot: String!
+  version: Int!
+  from: Address!
+  to: Address!
+  #value(unit: FilUnit = AttoFil): Float!
+  value: String!
+  gasFeeCap: String!
+  gasPremium: String!
+  gasLimit: Int64!
+  sizeBytes: Int!
+  nonce: Uint64!
+  method: Uint64!
+  actorName: String!
+  actorFamily: String!
+  exitCode: Int64!
+  gasUsed: Int64!
+  parentBaseFee: String!
+  baseFeeBurn: String!
+  overEstimationBurn: String!
+  minerPenalty: String!
+  minerTip: String!
+  refund: String!
+  gasRefund: Int64!
+  gasBurned: Int64!
+}
+
 type Address {
   id: ID!
-  str: String!
+  robust: String!
   actor: Actor!
 }
 

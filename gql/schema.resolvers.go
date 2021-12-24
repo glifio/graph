@@ -9,9 +9,11 @@ import (
 	"math/rand"
 	"strconv"
 
+	"github.com/filecoin-project/lily/model/derived"
 	"github.com/glifio/graph/gql/generated"
 	"github.com/glifio/graph/gql/model"
 	"github.com/glifio/graph/pkg/lily"
+	"github.com/jinzhu/copier"
 )
 
 func (r *messageResolver) To(ctx context.Context, obj *model.Message) (*model.Actor, error) {
@@ -66,6 +68,10 @@ func (r *queryResolver) Todos(ctx context.Context) ([]*model.Todo, error) {
 	panic(fmt.Errorf("not implemented"))
 }
 
+func (r *queryResolver) Message(ctx context.Context, cid *string) (*model.MessageConfirmed, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+
 func (r *queryResolver) Messages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.Message, error) {
 	//return postgres.GetMessages(), nil
 	var items []*model.Message
@@ -89,41 +95,71 @@ func (r *queryResolver) Messages(ctx context.Context, address *string, limit *in
 	return items, nil
 }
 
-func (r *queryResolver) PendingMessages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.Message, error) {
-	var items []*model.Message
-	pending, err := r.NodeService.GetPendingMessages(*address)
+func (r *queryResolver) PendingMessages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessagePending, error) {
+	var items []*model.MessagePending
+	//pending, err := r.NodeService.GetPendingMessages(*address)
+	pending, err := r.NodeService.GetPending()
 	if err != nil {
 		return nil, err
 	}
-	for i, item := range pending {
-		var msg model.Message
-		msg.Cid = item[i].Cid.String()
-		m, err := r.NodeService.GetMessage(msg.Cid)
-		if err != nil {
-			msg.To = m.To.String()
-			msg.Method = m.Method.String()
-			*msg.GasFeeCap = m.GasFeeCap.String()
-			*msg.GasLimit = strconv.FormatInt(m.GasLimit, 64)
-		}
-		fmt.Println(item[i].Cid)
+	// for i, item := range pending {
+	// 	var msg model.Message
+	// 	msg.Cid = item[i].Cid.String()
+	// 	m, err := r.NodeService.GetMessage(msg.Cid)
+	// 	if err != nil {
+	// 		msg.To = m.To.String()
+	// 		msg.Method = m.Method.String()
+	// 		*msg.GasFeeCap = m.GasFeeCap.String()
+	// 		*msg.GasLimit = strconv.FormatInt(m.GasLimit, 64)
+	// 	}
+	// 	fmt.Println(item[i].Cid)
+	// 	items = append(items, &msg)
+	// }
+	for _, item := range pending {
+		var msg model.MessagePending
+		msg.Cid = item.Cid().String()
+		msg.Version = new(int)
+		*msg.Version = int(item.Message.Version)
+		msg.Method = item.Message.Method.String()
+		msg.GasFeeCap = new(string)
+		var gasfeecap = item.Message.GasFeeCap.String()
+		msg.GasFeeCap = &gasfeecap
+		// var gaslimit = strconv.FormatInt(item.Message.GasLimit, 64)
+		// msg.GasLimit = &gaslimit
 		items = append(items, &msg)
 	}
 	return items, nil
 }
 
+func (r *queryResolver) MessagesConfirmed(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessageConfirmed, error) {
+	var items []*model.MessageConfirmed
+	var rs []derived.GasOutputs
+	rs, err := r.MessageConfirmedService.List(address, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range rs {
+		var item model.MessageConfirmed
+		copier.Copy(&item, &r)
+		items = append(items, &item)
+	}
+	return items, nil
+}
+
 func (r *queryResolver) Actor(ctx context.Context, address string) (*model.Actor, error) {
+	// TODO get this data from lily instead of the node
 	item, err := r.NodeService.GetActor(address)
 	if err != nil {
 		return nil, err
 	} else {
 		return &model.Actor{
-			ID:   address,
-			Code: item.Code.String(),
-			Head: item.Head.String(),
-			// StateRoot: item.StateRoot,
-			// Nonce:     item.Nonce,
-			// Height:    item.Height,
+			ID:      address,
+			Code:    item.Code.String(),
+			Head:    item.Head.String(),
+			Nonce:   strconv.FormatUint(item.Nonce, 64),
 			Balance: item.Balance.String(),
+			// StateRoot: item.StateRoot,
+			// Height:    item.Height,
 		}, nil
 	}
 }
@@ -152,6 +188,10 @@ func (r *queryResolver) Actors(ctx context.Context) ([]*model.Actor, error) {
 	// return items, nil
 }
 
+func (r *subscriptionResolver) Messages(ctx context.Context) (<-chan []*model.Message, error) {
+	panic(fmt.Errorf("not implemented"))
+}
+
 func (r *todoResolver) User(ctx context.Context, obj *model.Todo) (*model.User, error) {
 	return &model.User{ID: obj.UserID, Name: "user " + obj.UserID}, nil
 }
@@ -169,32 +209,14 @@ func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResol
 // Query returns generated.QueryResolver implementation.
 func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 
+// Subscription returns generated.SubscriptionResolver implementation.
+func (r *Resolver) Subscription() generated.SubscriptionResolver { return &subscriptionResolver{r} }
+
 // Todo returns generated.TodoResolver implementation.
 func (r *Resolver) Todo() generated.TodoResolver { return &todoResolver{r} }
 
 type messageResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+type subscriptionResolver struct{ *Resolver }
 type todoResolver struct{ *Resolver }
-
-// !!! WARNING !!!
-// The code below was going to be deleted when updating resolvers. It has been copied here so you have
-// one last chance to move it out of harms way if you want. There are two reasons this happens:
-//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
-//    it when you're done.
-//  - You have helper methods in this file. Move them out to keep these resolver files clean.
-func (r *messageResolver) Version(ctx context.Context, obj *model.Message) (*int, error) {
-	panic(fmt.Errorf("not implemented"))
-}
-func (r *messageResolver) Nonce(ctx context.Context, obj *model.Message) (*string, error) {
-	panic(fmt.Errorf("not implemented"))
-}
-func (r *messageResolver) GasLimit(ctx context.Context, obj *model.Message) (*string, error) {
-	panic(fmt.Errorf("not implemented"))
-}
-func (r *messageResolver) GasFeeCap(ctx context.Context, obj *model.Message) (*string, error) {
-	panic(fmt.Errorf("not implemented"))
-}
-func (r *messageResolver) GasPremium(ctx context.Context, obj *model.Message) (*string, error) {
-	panic(fmt.Errorf("not implemented"))
-}

@@ -7,12 +7,15 @@ require (
 	github.com/filecoin-project/go-address v0.0.6
 	github.com/filecoin-project/go-jsonrpc v0.1.5
 	github.com/filecoin-project/go-state-types v0.1.1
-	github.com/filecoin-project/lotus v1.13.0
+	github.com/filecoin-project/lily v0.8.5
+	github.com/filecoin-project/lotus v1.13.1
 	github.com/filecoin-project/specs-actors v0.9.14
 	github.com/go-chi/chi v1.5.4
+	github.com/go-pg/pg/v10 v10.10.6
 	github.com/ipfs/go-cid v0.1.0
+	github.com/jinzhu/copier v0.3.4
 	github.com/lib/pq v1.10.3
-	github.com/multiformats/go-multihash v0.0.15
+	github.com/multiformats/go-multihash v0.0.16
 	github.com/rs/cors v1.7.0
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5

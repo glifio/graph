@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -38,6 +39,7 @@ type ResolverRoot interface {
 	Message() MessageResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
+	Subscription() SubscriptionResolver
 	Todo() TodoResolver
 }
 
@@ -56,12 +58,55 @@ type ComplexityRoot struct {
 	}
 
 	Address struct {
-		Actor func(childComplexity int) int
-		ID    func(childComplexity int) int
-		Str   func(childComplexity int) int
+		Actor  func(childComplexity int) int
+		ID     func(childComplexity int) int
+		Robust func(childComplexity int) int
 	}
 
 	Message struct {
+		Cid        func(childComplexity int) int
+		From       func(childComplexity int) int
+		GasFeeCap  func(childComplexity int) int
+		GasLimit   func(childComplexity int) int
+		GasPremium func(childComplexity int) int
+		Height     func(childComplexity int) int
+		Method     func(childComplexity int) int
+		Nonce      func(childComplexity int) int
+		Params     func(childComplexity int) int
+		To         func(childComplexity int) int
+		Value      func(childComplexity int) int
+		Version    func(childComplexity int) int
+	}
+
+	MessageConfirmed struct {
+		ActorFamily        func(childComplexity int) int
+		ActorName          func(childComplexity int) int
+		BaseFeeBurn        func(childComplexity int) int
+		Cid                func(childComplexity int) int
+		ExitCode           func(childComplexity int) int
+		From               func(childComplexity int) int
+		GasBurned          func(childComplexity int) int
+		GasFeeCap          func(childComplexity int) int
+		GasLimit           func(childComplexity int) int
+		GasPremium         func(childComplexity int) int
+		GasRefund          func(childComplexity int) int
+		GasUsed            func(childComplexity int) int
+		Height             func(childComplexity int) int
+		Method             func(childComplexity int) int
+		MinerPenalty       func(childComplexity int) int
+		MinerTip           func(childComplexity int) int
+		Nonce              func(childComplexity int) int
+		OverEstimationBurn func(childComplexity int) int
+		ParentBaseFee      func(childComplexity int) int
+		Refund             func(childComplexity int) int
+		SizeBytes          func(childComplexity int) int
+		StateRoot          func(childComplexity int) int
+		To                 func(childComplexity int) int
+		Value              func(childComplexity int) int
+		Version            func(childComplexity int) int
+	}
+
+	MessagePending struct {
 		Cid        func(childComplexity int) int
 		From       func(childComplexity int) int
 		GasFeeCap  func(childComplexity int) int
@@ -81,11 +126,13 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Actor           func(childComplexity int, address string) int
-		Actors          func(childComplexity int) int
-		Messages        func(childComplexity int, address *string, limit *int, offset *int) int
-		PendingMessages func(childComplexity int, address *string, limit *int, offset *int) int
-		Todos           func(childComplexity int) int
+		Actor             func(childComplexity int, address string) int
+		Actors            func(childComplexity int) int
+		Message           func(childComplexity int, cid *string) int
+		Messages          func(childComplexity int, address *string, limit *int, offset *int) int
+		MessagesConfirmed func(childComplexity int, address *string, limit *int, offset *int) int
+		PendingMessages   func(childComplexity int, address *string, limit *int, offset *int) int
+		Todos             func(childComplexity int) int
 	}
 
 	QueryMessage struct {
@@ -94,6 +141,10 @@ type ComplexityRoot struct {
 
 	QueryUser struct {
 		Users func(childComplexity int) int
+	}
+
+	Subscription struct {
+		Messages func(childComplexity int) int
 	}
 
 	Todo struct {
@@ -119,10 +170,15 @@ type MutationResolver interface {
 }
 type QueryResolver interface {
 	Todos(ctx context.Context) ([]*model.Todo, error)
+	Message(ctx context.Context, cid *string) (*model.MessageConfirmed, error)
 	Messages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.Message, error)
-	PendingMessages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.Message, error)
+	PendingMessages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessagePending, error)
+	MessagesConfirmed(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessageConfirmed, error)
 	Actor(ctx context.Context, address string) (*model.Actor, error)
 	Actors(ctx context.Context) ([]*model.Actor, error)
+}
+type SubscriptionResolver interface {
+	Messages(ctx context.Context) (<-chan []*model.Message, error)
 }
 type TodoResolver interface {
 	User(ctx context.Context, obj *model.Todo) (*model.User, error)
@@ -212,12 +268,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Address.ID(childComplexity), true
 
-	case "Address.str":
-		if e.complexity.Address.Str == nil {
+	case "Address.robust":
+		if e.complexity.Address.Robust == nil {
 			break
 		}
 
-		return e.complexity.Address.Str(childComplexity), true
+		return e.complexity.Address.Robust(childComplexity), true
 
 	case "Message.cid":
 		if e.complexity.Message.Cid == nil {
@@ -233,21 +289,21 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Message.From(childComplexity), true
 
-	case "Message.GasFeeCap":
+	case "Message.gasFeeCap":
 		if e.complexity.Message.GasFeeCap == nil {
 			break
 		}
 
 		return e.complexity.Message.GasFeeCap(childComplexity), true
 
-	case "Message.GasLimit":
+	case "Message.gasLimit":
 		if e.complexity.Message.GasLimit == nil {
 			break
 		}
 
 		return e.complexity.Message.GasLimit(childComplexity), true
 
-	case "Message.GasPremium":
+	case "Message.gasPremium":
 		if e.complexity.Message.GasPremium == nil {
 			break
 		}
@@ -268,7 +324,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Message.Method(childComplexity), true
 
-	case "Message.Nonce":
+	case "Message.nonce":
 		if e.complexity.Message.Nonce == nil {
 			break
 		}
@@ -303,6 +359,265 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Message.Version(childComplexity), true
 
+	case "MessageConfirmed.actorFamily":
+		if e.complexity.MessageConfirmed.ActorFamily == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.ActorFamily(childComplexity), true
+
+	case "MessageConfirmed.actorName":
+		if e.complexity.MessageConfirmed.ActorName == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.ActorName(childComplexity), true
+
+	case "MessageConfirmed.baseFeeBurn":
+		if e.complexity.MessageConfirmed.BaseFeeBurn == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.BaseFeeBurn(childComplexity), true
+
+	case "MessageConfirmed.cid":
+		if e.complexity.MessageConfirmed.Cid == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.Cid(childComplexity), true
+
+	case "MessageConfirmed.exitCode":
+		if e.complexity.MessageConfirmed.ExitCode == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.ExitCode(childComplexity), true
+
+	case "MessageConfirmed.from":
+		if e.complexity.MessageConfirmed.From == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.From(childComplexity), true
+
+	case "MessageConfirmed.gasBurned":
+		if e.complexity.MessageConfirmed.GasBurned == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.GasBurned(childComplexity), true
+
+	case "MessageConfirmed.gasFeeCap":
+		if e.complexity.MessageConfirmed.GasFeeCap == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.GasFeeCap(childComplexity), true
+
+	case "MessageConfirmed.gasLimit":
+		if e.complexity.MessageConfirmed.GasLimit == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.GasLimit(childComplexity), true
+
+	case "MessageConfirmed.gasPremium":
+		if e.complexity.MessageConfirmed.GasPremium == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.GasPremium(childComplexity), true
+
+	case "MessageConfirmed.gasRefund":
+		if e.complexity.MessageConfirmed.GasRefund == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.GasRefund(childComplexity), true
+
+	case "MessageConfirmed.gasUsed":
+		if e.complexity.MessageConfirmed.GasUsed == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.GasUsed(childComplexity), true
+
+	case "MessageConfirmed.height":
+		if e.complexity.MessageConfirmed.Height == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.Height(childComplexity), true
+
+	case "MessageConfirmed.method":
+		if e.complexity.MessageConfirmed.Method == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.Method(childComplexity), true
+
+	case "MessageConfirmed.minerPenalty":
+		if e.complexity.MessageConfirmed.MinerPenalty == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.MinerPenalty(childComplexity), true
+
+	case "MessageConfirmed.minerTip":
+		if e.complexity.MessageConfirmed.MinerTip == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.MinerTip(childComplexity), true
+
+	case "MessageConfirmed.nonce":
+		if e.complexity.MessageConfirmed.Nonce == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.Nonce(childComplexity), true
+
+	case "MessageConfirmed.overEstimationBurn":
+		if e.complexity.MessageConfirmed.OverEstimationBurn == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.OverEstimationBurn(childComplexity), true
+
+	case "MessageConfirmed.parentBaseFee":
+		if e.complexity.MessageConfirmed.ParentBaseFee == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.ParentBaseFee(childComplexity), true
+
+	case "MessageConfirmed.refund":
+		if e.complexity.MessageConfirmed.Refund == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.Refund(childComplexity), true
+
+	case "MessageConfirmed.sizeBytes":
+		if e.complexity.MessageConfirmed.SizeBytes == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.SizeBytes(childComplexity), true
+
+	case "MessageConfirmed.stateRoot":
+		if e.complexity.MessageConfirmed.StateRoot == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.StateRoot(childComplexity), true
+
+	case "MessageConfirmed.to":
+		if e.complexity.MessageConfirmed.To == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.To(childComplexity), true
+
+	case "MessageConfirmed.value":
+		if e.complexity.MessageConfirmed.Value == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.Value(childComplexity), true
+
+	case "MessageConfirmed.version":
+		if e.complexity.MessageConfirmed.Version == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.Version(childComplexity), true
+
+	case "MessagePending.cid":
+		if e.complexity.MessagePending.Cid == nil {
+			break
+		}
+
+		return e.complexity.MessagePending.Cid(childComplexity), true
+
+	case "MessagePending.from":
+		if e.complexity.MessagePending.From == nil {
+			break
+		}
+
+		return e.complexity.MessagePending.From(childComplexity), true
+
+	case "MessagePending.gasFeeCap":
+		if e.complexity.MessagePending.GasFeeCap == nil {
+			break
+		}
+
+		return e.complexity.MessagePending.GasFeeCap(childComplexity), true
+
+	case "MessagePending.gasLimit":
+		if e.complexity.MessagePending.GasLimit == nil {
+			break
+		}
+
+		return e.complexity.MessagePending.GasLimit(childComplexity), true
+
+	case "MessagePending.gasPremium":
+		if e.complexity.MessagePending.GasPremium == nil {
+			break
+		}
+
+		return e.complexity.MessagePending.GasPremium(childComplexity), true
+
+	case "MessagePending.height":
+		if e.complexity.MessagePending.Height == nil {
+			break
+		}
+
+		return e.complexity.MessagePending.Height(childComplexity), true
+
+	case "MessagePending.method":
+		if e.complexity.MessagePending.Method == nil {
+			break
+		}
+
+		return e.complexity.MessagePending.Method(childComplexity), true
+
+	case "MessagePending.nonce":
+		if e.complexity.MessagePending.Nonce == nil {
+			break
+		}
+
+		return e.complexity.MessagePending.Nonce(childComplexity), true
+
+	case "MessagePending.params":
+		if e.complexity.MessagePending.Params == nil {
+			break
+		}
+
+		return e.complexity.MessagePending.Params(childComplexity), true
+
+	case "MessagePending.to":
+		if e.complexity.MessagePending.To == nil {
+			break
+		}
+
+		return e.complexity.MessagePending.To(childComplexity), true
+
+	case "MessagePending.value":
+		if e.complexity.MessagePending.Value == nil {
+			break
+		}
+
+		return e.complexity.MessagePending.Value(childComplexity), true
+
+	case "MessagePending.version":
+		if e.complexity.MessagePending.Version == nil {
+			break
+		}
+
+		return e.complexity.MessagePending.Version(childComplexity), true
+
 	case "Mutation.createTodo":
 		if e.complexity.Mutation.CreateTodo == nil {
 			break
@@ -334,6 +649,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.Actors(childComplexity), true
 
+	case "Query.message":
+		if e.complexity.Query.Message == nil {
+			break
+		}
+
+		args, err := ec.field_Query_message_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.Message(childComplexity, args["cid"].(*string)), true
+
 	case "Query.messages":
 		if e.complexity.Query.Messages == nil {
 			break
@@ -345,6 +672,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.Messages(childComplexity, args["address"].(*string), args["limit"].(*int), args["offset"].(*int)), true
+
+	case "Query.messagesConfirmed":
+		if e.complexity.Query.MessagesConfirmed == nil {
+			break
+		}
+
+		args, err := ec.field_Query_messagesConfirmed_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.MessagesConfirmed(childComplexity, args["address"].(*string), args["limit"].(*int), args["offset"].(*int)), true
 
 	case "Query.pendingMessages":
 		if e.complexity.Query.PendingMessages == nil {
@@ -378,6 +717,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.QueryUser.Users(childComplexity), true
+
+	case "Subscription.messages":
+		if e.complexity.Subscription.Messages == nil {
+			break
+		}
+
+		return e.complexity.Subscription.Messages(childComplexity), true
 
 	case "Todo.actor":
 		if e.complexity.Todo.Actor == nil {
@@ -466,6 +812,23 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 				Data: buf.Bytes(),
 			}
 		}
+	case ast.Subscription:
+		next := ec._Subscription(ctx, rc.Operation.SelectionSet)
+
+		var buf bytes.Buffer
+		return func(ctx context.Context) *graphql.Response {
+			buf.Reset()
+			data := next()
+
+			if data == nil {
+				return nil
+			}
+			data.MarshalGQL(&buf)
+
+			return &graphql.Response{
+				Data: buf.Bytes(),
+			}
+		}
 
 	default:
 		return graphql.OneShot(graphql.ErrorResponse(ctx, "unsupported GraphQL operation"))
@@ -496,10 +859,23 @@ var sources = []*ast.Source{
 #
 # https://gqlgen.com/getting-started/
 
+scalar Int64
+scalar Uint64
+
 type Query {
   todos: [Todo!]!
+  message(cid: String): MessageConfirmed!
   messages(address: String, limit: Int = 5, offset: Int = 0): [Message!]!
-  pendingMessages(address: String, limit: Int = 5, offset: Int = 0): [Message!]!
+  pendingMessages(
+    address: String
+    limit: Int = 5
+    offset: Int = 0
+  ): [MessagePending!]! #mempool
+  messagesConfirmed(
+    address: String
+    limit: Int = 5
+    offset: Int = 0
+  ): [MessageConfirmed!]! # lily
   #address(str: String!): Address
   actor(address: String!): Actor
   actors: [Actor!]!
@@ -507,6 +883,10 @@ type Query {
 
 type Mutation {
   createTodo(input: NewTodo!): Todo!
+}
+
+type Subscription {
+  messages: [Message!]
 }
 
 # Units of height
@@ -531,20 +911,65 @@ type Message {
   version: Int
   to: Actor!
   from: Actor!
-  Nonce: String
+  nonce: String
   #value(unit: FilUnit = AttoFil): Float!
   value: Float!
-  GasLimit: String
-  GasFeeCap: String
-  GasPremium: String
+  gasLimit: String
+  gasFeeCap: String
+  gasPremium: String
   method: String!
   height: Float!
   params: String
 }
 
+type MessagePending {
+  cid: String!
+  version: Int
+  to: Address!
+  from: Address!
+  nonce: String
+  #value(unit: FilUnit = AttoFil): Float!
+  value: Float!
+  gasLimit: String
+  gasFeeCap: String
+  gasPremium: String
+  method: String!
+  height: Float!
+  params: String
+}
+
+type MessageConfirmed {
+  cid: String!
+  height: Int64!
+  stateRoot: String!
+  version: Int!
+  from: Address!
+  to: Address!
+  #value(unit: FilUnit = AttoFil): Float!
+  value: String!
+  gasFeeCap: String!
+  gasPremium: String!
+  gasLimit: Int64!
+  sizeBytes: Int!
+  nonce: Uint64!
+  method: Uint64!
+  actorName: String!
+  actorFamily: String!
+  exitCode: Int64!
+  gasUsed: Int64!
+  parentBaseFee: String!
+  baseFeeBurn: String!
+  overEstimationBurn: String!
+  minerPenalty: String!
+  minerTip: String!
+  refund: String!
+  gasRefund: Int64!
+  gasBurned: Int64!
+}
+
 type Address {
   id: ID!
-  str: String!
+  robust: String!
   actor: Actor!
 }
 
@@ -640,6 +1065,54 @@ func (ec *executionContext) field_Query_actor_args(ctx context.Context, rawArgs 
 		}
 	}
 	args["address"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_message_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["cid"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("cid"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["cid"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_messagesConfirmed_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["address"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["address"] = arg0
+	var arg1 *int
+	if tmp, ok := rawArgs["limit"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+		arg1, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["limit"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["offset"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("offset"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["offset"] = arg2
 	return args, nil
 }
 
@@ -1034,7 +1507,7 @@ func (ec *executionContext) _Address_id(ctx context.Context, field graphql.Colle
 	return ec.marshalNID2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Address_str(ctx context.Context, field graphql.CollectedField, obj *model.Address) (ret graphql.Marshaler) {
+func (ec *executionContext) _Address_robust(ctx context.Context, field graphql.CollectedField, obj *model.Address) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -1052,7 +1525,7 @@ func (ec *executionContext) _Address_str(ctx context.Context, field graphql.Coll
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Str, nil
+		return obj.Robust, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1241,7 +1714,7 @@ func (ec *executionContext) _Message_from(ctx context.Context, field graphql.Col
 	return ec.marshalNActor2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐActor(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Message_Nonce(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
+func (ec *executionContext) _Message_nonce(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -1308,7 +1781,7 @@ func (ec *executionContext) _Message_value(ctx context.Context, field graphql.Co
 	return ec.marshalNFloat2float64(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Message_GasLimit(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
+func (ec *executionContext) _Message_gasLimit(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -1340,7 +1813,7 @@ func (ec *executionContext) _Message_GasLimit(ctx context.Context, field graphql
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Message_GasFeeCap(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
+func (ec *executionContext) _Message_gasFeeCap(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -1372,7 +1845,7 @@ func (ec *executionContext) _Message_GasFeeCap(ctx context.Context, field graphq
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Message_GasPremium(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
+func (ec *executionContext) _Message_gasPremium(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -1506,6 +1979,1283 @@ func (ec *executionContext) _Message_params(ctx context.Context, field graphql.C
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _MessageConfirmed_cid(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_height(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Height, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int64)
+	fc.Result = res
+	return ec.marshalNInt642int64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_stateRoot(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.StateRoot, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_version(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Version, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_from(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.From, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.Address)
+	fc.Result = res
+	return ec.marshalNAddress2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐAddress(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_to(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.To, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.Address)
+	fc.Result = res
+	return ec.marshalNAddress2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐAddress(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_value(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Value, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_gasFeeCap(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.GasFeeCap, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_gasPremium(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.GasPremium, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_gasLimit(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.GasLimit, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int64)
+	fc.Result = res
+	return ec.marshalNInt642int64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_sizeBytes(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SizeBytes, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_nonce(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Nonce, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint64)
+	fc.Result = res
+	return ec.marshalNUint642uint64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_method(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Method, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint64)
+	fc.Result = res
+	return ec.marshalNUint642uint64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_actorName(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ActorName, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_actorFamily(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ActorFamily, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_exitCode(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ExitCode, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int64)
+	fc.Result = res
+	return ec.marshalNInt642int64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_gasUsed(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.GasUsed, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int64)
+	fc.Result = res
+	return ec.marshalNInt642int64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_parentBaseFee(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ParentBaseFee, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_baseFeeBurn(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.BaseFeeBurn, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_overEstimationBurn(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.OverEstimationBurn, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_minerPenalty(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MinerPenalty, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_minerTip(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MinerTip, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_refund(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Refund, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_gasRefund(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.GasRefund, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int64)
+	fc.Result = res
+	return ec.marshalNInt642int64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_gasBurned(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.GasBurned, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int64)
+	fc.Result = res
+	return ec.marshalNInt642int64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessagePending_cid(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessagePending",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessagePending_version(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessagePending",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Version, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessagePending_to(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessagePending",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.To, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.Address)
+	fc.Result = res
+	return ec.marshalNAddress2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐAddress(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessagePending_from(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessagePending",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.From, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.Address)
+	fc.Result = res
+	return ec.marshalNAddress2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐAddress(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessagePending_nonce(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessagePending",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Nonce, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessagePending_value(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessagePending",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Value, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(float64)
+	fc.Result = res
+	return ec.marshalNFloat2float64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessagePending_gasLimit(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessagePending",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.GasLimit, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessagePending_gasFeeCap(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessagePending",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.GasFeeCap, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessagePending_gasPremium(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessagePending",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.GasPremium, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessagePending_method(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessagePending",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Method, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessagePending_height(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessagePending",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Height, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(float64)
+	fc.Result = res
+	return ec.marshalNFloat2float64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessagePending_params(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessagePending",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Params, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Mutation_createTodo(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -1581,6 +3331,48 @@ func (ec *executionContext) _Query_todos(ctx context.Context, field graphql.Coll
 	res := resTmp.([]*model.Todo)
 	fc.Result = res
 	return ec.marshalNTodo2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐTodoᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_message(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_message_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().Message(rctx, args["cid"].(*string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.MessageConfirmed)
+	fc.Result = res
+	return ec.marshalNMessageConfirmed2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageConfirmed(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_messages(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -1662,9 +3454,51 @@ func (ec *executionContext) _Query_pendingMessages(ctx context.Context, field gr
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*model.Message)
+	res := resTmp.([]*model.MessagePending)
 	fc.Result = res
-	return ec.marshalNMessage2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageᚄ(ctx, field.Selections, res)
+	return ec.marshalNMessagePending2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessagePendingᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_messagesConfirmed(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_messagesConfirmed_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().MessagesConfirmed(rctx, args["address"].(*string), args["limit"].(*int), args["offset"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*model.MessageConfirmed)
+	fc.Result = res
+	return ec.marshalNMessageConfirmed2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageConfirmedᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_actor(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -1880,6 +3714,48 @@ func (ec *executionContext) _QueryUser_users(ctx context.Context, field graphql.
 	res := resTmp.([]*model.User)
 	fc.Result = res
 	return ec.marshalNUser2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐUserᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Subscription_messages(ctx context.Context, field graphql.CollectedField) (ret func() graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = nil
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Subscription().Messages(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return nil
+	}
+	if resTmp == nil {
+		return nil
+	}
+	return func() graphql.Marshaler {
+		res, ok := <-resTmp.(<-chan []*model.Message)
+		if !ok {
+			return nil
+		}
+		return graphql.WriterFunc(func(w io.Writer) {
+			w.Write([]byte{'{'})
+			graphql.MarshalString(field.Alias).MarshalGQL(w)
+			w.Write([]byte{':'})
+			ec.marshalOMessage2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageᚄ(ctx, field.Selections, res).MarshalGQL(w)
+			w.Write([]byte{'}'})
+		})
+	}
 }
 
 func (ec *executionContext) _Todo_id(ctx context.Context, field graphql.CollectedField, obj *model.Todo) (ret graphql.Marshaler) {
@@ -3361,8 +5237,8 @@ func (ec *executionContext) _Address(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		case "str":
-			out.Values[i] = ec._Address_str(ctx, field, obj)
+		case "robust":
+			out.Values[i] = ec._Address_robust(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
@@ -3428,19 +5304,19 @@ func (ec *executionContext) _Message(ctx context.Context, sel ast.SelectionSet, 
 				}
 				return res
 			})
-		case "Nonce":
-			out.Values[i] = ec._Message_Nonce(ctx, field, obj)
+		case "nonce":
+			out.Values[i] = ec._Message_nonce(ctx, field, obj)
 		case "value":
 			out.Values[i] = ec._Message_value(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
-		case "GasLimit":
-			out.Values[i] = ec._Message_GasLimit(ctx, field, obj)
-		case "GasFeeCap":
-			out.Values[i] = ec._Message_GasFeeCap(ctx, field, obj)
-		case "GasPremium":
-			out.Values[i] = ec._Message_GasPremium(ctx, field, obj)
+		case "gasLimit":
+			out.Values[i] = ec._Message_gasLimit(ctx, field, obj)
+		case "gasFeeCap":
+			out.Values[i] = ec._Message_gasFeeCap(ctx, field, obj)
+		case "gasPremium":
+			out.Values[i] = ec._Message_gasPremium(ctx, field, obj)
 		case "method":
 			out.Values[i] = ec._Message_method(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -3453,6 +5329,217 @@ func (ec *executionContext) _Message(ctx context.Context, sel ast.SelectionSet, 
 			}
 		case "params":
 			out.Values[i] = ec._Message_params(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var messageConfirmedImplementors = []string{"MessageConfirmed"}
+
+func (ec *executionContext) _MessageConfirmed(ctx context.Context, sel ast.SelectionSet, obj *model.MessageConfirmed) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, messageConfirmedImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MessageConfirmed")
+		case "cid":
+			out.Values[i] = ec._MessageConfirmed_cid(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "height":
+			out.Values[i] = ec._MessageConfirmed_height(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "stateRoot":
+			out.Values[i] = ec._MessageConfirmed_stateRoot(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "version":
+			out.Values[i] = ec._MessageConfirmed_version(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "from":
+			out.Values[i] = ec._MessageConfirmed_from(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "to":
+			out.Values[i] = ec._MessageConfirmed_to(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "value":
+			out.Values[i] = ec._MessageConfirmed_value(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "gasFeeCap":
+			out.Values[i] = ec._MessageConfirmed_gasFeeCap(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "gasPremium":
+			out.Values[i] = ec._MessageConfirmed_gasPremium(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "gasLimit":
+			out.Values[i] = ec._MessageConfirmed_gasLimit(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "sizeBytes":
+			out.Values[i] = ec._MessageConfirmed_sizeBytes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "nonce":
+			out.Values[i] = ec._MessageConfirmed_nonce(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "method":
+			out.Values[i] = ec._MessageConfirmed_method(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "actorName":
+			out.Values[i] = ec._MessageConfirmed_actorName(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "actorFamily":
+			out.Values[i] = ec._MessageConfirmed_actorFamily(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "exitCode":
+			out.Values[i] = ec._MessageConfirmed_exitCode(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "gasUsed":
+			out.Values[i] = ec._MessageConfirmed_gasUsed(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "parentBaseFee":
+			out.Values[i] = ec._MessageConfirmed_parentBaseFee(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "baseFeeBurn":
+			out.Values[i] = ec._MessageConfirmed_baseFeeBurn(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "overEstimationBurn":
+			out.Values[i] = ec._MessageConfirmed_overEstimationBurn(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "minerPenalty":
+			out.Values[i] = ec._MessageConfirmed_minerPenalty(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "minerTip":
+			out.Values[i] = ec._MessageConfirmed_minerTip(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "refund":
+			out.Values[i] = ec._MessageConfirmed_refund(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "gasRefund":
+			out.Values[i] = ec._MessageConfirmed_gasRefund(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "gasBurned":
+			out.Values[i] = ec._MessageConfirmed_gasBurned(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var messagePendingImplementors = []string{"MessagePending"}
+
+func (ec *executionContext) _MessagePending(ctx context.Context, sel ast.SelectionSet, obj *model.MessagePending) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, messagePendingImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MessagePending")
+		case "cid":
+			out.Values[i] = ec._MessagePending_cid(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "version":
+			out.Values[i] = ec._MessagePending_version(ctx, field, obj)
+		case "to":
+			out.Values[i] = ec._MessagePending_to(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "from":
+			out.Values[i] = ec._MessagePending_from(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "nonce":
+			out.Values[i] = ec._MessagePending_nonce(ctx, field, obj)
+		case "value":
+			out.Values[i] = ec._MessagePending_value(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "gasLimit":
+			out.Values[i] = ec._MessagePending_gasLimit(ctx, field, obj)
+		case "gasFeeCap":
+			out.Values[i] = ec._MessagePending_gasFeeCap(ctx, field, obj)
+		case "gasPremium":
+			out.Values[i] = ec._MessagePending_gasPremium(ctx, field, obj)
+		case "method":
+			out.Values[i] = ec._MessagePending_method(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "height":
+			out.Values[i] = ec._MessagePending_height(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "params":
+			out.Values[i] = ec._MessagePending_params(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -3524,6 +5611,20 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				}
 				return res
 			})
+		case "message":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_message(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
 		case "messages":
 			field := field
 			out.Concurrently(i, func() (res graphql.Marshaler) {
@@ -3547,6 +5648,20 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_pendingMessages(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
+		case "messagesConfirmed":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_messagesConfirmed(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&invalids, 1)
 				}
@@ -3644,6 +5759,26 @@ func (ec *executionContext) _QueryUser(ctx context.Context, sel ast.SelectionSet
 		return graphql.Null
 	}
 	return out
+}
+
+var subscriptionImplementors = []string{"Subscription"}
+
+func (ec *executionContext) _Subscription(ctx context.Context, sel ast.SelectionSet) func() graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, subscriptionImplementors)
+	ctx = graphql.WithFieldContext(ctx, &graphql.FieldContext{
+		Object: "Subscription",
+	})
+	if len(fields) != 1 {
+		ec.Errorf(ctx, "must subscribe to exactly one stream")
+		return nil
+	}
+
+	switch fields[0].Name {
+	case "messages":
+		return ec._Subscription_messages(ctx, fields[0])
+	default:
+		panic("unknown field " + strconv.Quote(fields[0].Name))
+	}
 }
 
 var todoImplementors = []string{"Todo"}
@@ -4051,6 +6186,16 @@ func (ec *executionContext) marshalNActor2ᚖgithubᚗcomᚋglifioᚋgraphᚋgql
 	return ec._Actor(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNAddress2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐAddress(ctx context.Context, sel ast.SelectionSet, v *model.Address) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._Address(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v interface{}) (bool, error) {
 	res, err := graphql.UnmarshalBoolean(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -4088,6 +6233,36 @@ func (ec *executionContext) unmarshalNID2string(ctx context.Context, v interface
 
 func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
 	res := graphql.MarshalID(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+	}
+	return res
+}
+
+func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v interface{}) (int, error) {
+	res, err := graphql.UnmarshalInt(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.SelectionSet, v int) graphql.Marshaler {
+	res := graphql.MarshalInt(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+	}
+	return res
+}
+
+func (ec *executionContext) unmarshalNInt642int64(ctx context.Context, v interface{}) (int64, error) {
+	res, err := graphql.UnmarshalInt64(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNInt642int64(ctx context.Context, sel ast.SelectionSet, v int64) graphql.Marshaler {
+	res := graphql.MarshalInt64(v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "must not be null")
@@ -4148,6 +6323,118 @@ func (ec *executionContext) marshalNMessage2ᚖgithubᚗcomᚋglifioᚋgraphᚋg
 		return graphql.Null
 	}
 	return ec._Message(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNMessageConfirmed2githubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageConfirmed(ctx context.Context, sel ast.SelectionSet, v model.MessageConfirmed) graphql.Marshaler {
+	return ec._MessageConfirmed(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNMessageConfirmed2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageConfirmedᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.MessageConfirmed) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNMessageConfirmed2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageConfirmed(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNMessageConfirmed2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageConfirmed(ctx context.Context, sel ast.SelectionSet, v *model.MessageConfirmed) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._MessageConfirmed(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNMessagePending2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessagePendingᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.MessagePending) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNMessagePending2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessagePending(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNMessagePending2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessagePending(ctx context.Context, sel ast.SelectionSet, v *model.MessagePending) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._MessagePending(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNNewTodo2githubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐNewTodo(ctx context.Context, v interface{}) (model.NewTodo, error) {
@@ -4226,6 +6513,21 @@ func (ec *executionContext) marshalNTodo2ᚖgithubᚗcomᚋglifioᚋgraphᚋgql�
 		return graphql.Null
 	}
 	return ec._Todo(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNUint642uint64(ctx context.Context, v interface{}) (uint64, error) {
+	res, err := graphql.UnmarshalUint64(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNUint642uint64(ctx context.Context, sel ast.SelectionSet, v uint64) graphql.Marshaler {
+	res := graphql.MarshalUint64(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+	}
+	return res
 }
 
 func (ec *executionContext) marshalNUser2githubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐUser(ctx context.Context, sel ast.SelectionSet, v model.User) graphql.Marshaler {
@@ -4603,6 +6905,53 @@ func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.Sele
 		return graphql.Null
 	}
 	return graphql.MarshalInt(*v)
+}
+
+func (ec *executionContext) marshalOMessage2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Message) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNMessage2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessage(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) unmarshalOString2string(ctx context.Context, v interface{}) (string, error) {

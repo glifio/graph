@@ -19,9 +19,52 @@ type Actor struct {
 }
 
 type Address struct {
-	ID    string `json:"id"`
-	Str   string `json:"str"`
-	Actor *Actor `json:"actor"`
+	ID     string `json:"id"`
+	Robust string `json:"robust"`
+	Actor  *Actor `json:"actor"`
+}
+
+type MessageConfirmed struct {
+	Cid                string   `json:"cid"`
+	Height             int64    `json:"height"`
+	StateRoot          string   `json:"stateRoot"`
+	Version            int      `json:"version"`
+	From               *Address `json:"from"`
+	To                 *Address `json:"to"`
+	Value              string   `json:"value"`
+	GasFeeCap          string   `json:"gasFeeCap"`
+	GasPremium         string   `json:"gasPremium"`
+	GasLimit           int64    `json:"gasLimit"`
+	SizeBytes          int      `json:"sizeBytes"`
+	Nonce              uint64   `json:"nonce"`
+	Method             uint64   `json:"method"`
+	ActorName          string   `json:"actorName"`
+	ActorFamily        string   `json:"actorFamily"`
+	ExitCode           int64    `json:"exitCode"`
+	GasUsed            int64    `json:"gasUsed"`
+	ParentBaseFee      string   `json:"parentBaseFee"`
+	BaseFeeBurn        string   `json:"baseFeeBurn"`
+	OverEstimationBurn string   `json:"overEstimationBurn"`
+	MinerPenalty       string   `json:"minerPenalty"`
+	MinerTip           string   `json:"minerTip"`
+	Refund             string   `json:"refund"`
+	GasRefund          int64    `json:"gasRefund"`
+	GasBurned          int64    `json:"gasBurned"`
+}
+
+type MessagePending struct {
+	Cid        string   `json:"cid"`
+	Version    *int     `json:"version"`
+	To         *Address `json:"to"`
+	From       *Address `json:"from"`
+	Nonce      *string  `json:"nonce"`
+	Value      float64  `json:"value"`
+	GasLimit   *string  `json:"gasLimit"`
+	GasFeeCap  *string  `json:"gasFeeCap"`
+	GasPremium *string  `json:"gasPremium"`
+	Method     string   `json:"method"`
+	Height     float64  `json:"height"`
+	Params     *string  `json:"params"`
 }
 
 type NewTodo struct {

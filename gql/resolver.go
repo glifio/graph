@@ -16,4 +16,5 @@ type Resolver struct{
 	todos []*model.Todo
 	NodeService node.NodeInterface
 	MessageService lily.MessageInterface
+	MessageConfirmedService lily.MessageConfirmedInterface
 }

@@ -32,9 +32,8 @@ var daemonCmd = &cobra.Command{
     fmt.Println("start the graphQL server")
 	// Create a new connection to our pg database
 	var db postgres.Database
-	err = db.New(
-		db.ConnString(config.DbHost, config.DbPort, config.DbUser, config.DbPassword, config.DbDatabase, config.DbSchema),
-	)
+	err = db.New(config.DbHost, config.DbPort, config.DbUser, config.DbPassword, config.DbDatabase, config.DbSchema)
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -48,6 +47,8 @@ var daemonCmd = &cobra.Command{
 	// actorService.Init(db)
 	messageService := &postgres.Message{}
 	messageService.Init(db)
+	messageConfirmedService := &postgres.MessageConfirmed{}
+	messageConfirmedService.Init(db)
 
 	router := chi.NewRouter()
 
@@ -59,7 +60,7 @@ var daemonCmd = &cobra.Command{
 		Debug:            true,
 	}).Handler)
 
-	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &graph.Resolver{NodeService: nodeService, MessageService: messageService}}))
+	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &graph.Resolver{NodeService: nodeService, MessageService: messageService, MessageConfirmedService: messageConfirmedService}}))
 
 	router.Handle("/", playground.Handler("GraphQL playground", "/query"))
 	router.Handle("/query", srv)
