@@ -10,6 +10,7 @@ import (
 	"github.com/filecoin-project/go-jsonrpc"
 	lotusapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/glifio/graph/gql/model"
 	"github.com/ipfs/go-cid"
 )
 
@@ -18,6 +19,7 @@ type NodeInterface interface {
 	GetPendingMessages(id string) ([][]lotusapi.MessageCheckStatus, error)
 	GetPending() ([]*types.SignedMessage, error)
 	GetMessage(cidcc string) (*types.Message, error)
+	AddressLookup(id string) (*model.Address, error)
 }
 
 type Node struct {
@@ -106,4 +108,29 @@ func (t *Node) GetPending() ([]*types.SignedMessage, error) {
 	}
 
 	return status, nil
+}
+
+func (t *Node) AddressLookup(id string) (*model.Address, error){
+	result := &model.Address{}
+	addr, err := address.NewFromString(id)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var rs address.Address
+	switch(addr.Protocol()){
+		case address.ID:
+			//protocol = ID
+			result.ID = addr.String()
+			rs, err = t.api.StateAccountKey(context.Background(), addr, types.EmptyTSK)
+			if(err==nil){
+				result.Robust = rs.String()
+			}
+		default:
+			result.Robust = addr.String()
+			rs, err = t.api.StateLookupID(context.Background(), addr, types.EmptyTSK)
+			if(err==nil){
+				result.ID = rs.String()
+			}
+	}
+	return result, nil
 }

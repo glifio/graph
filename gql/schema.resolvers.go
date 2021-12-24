@@ -54,6 +54,16 @@ func (r *messageResolver) From(ctx context.Context, obj *model.Message) (*model.
 	}
 }
 
+func (r *messageConfirmedResolver) From(ctx context.Context, obj *model.MessageConfirmed) (*model.Address, error) {
+	addr, err := r.NodeService.AddressLookup(obj.From)
+	return addr, err
+}
+
+func (r *messageConfirmedResolver) To(ctx context.Context, obj *model.MessageConfirmed) (*model.Address, error) {
+	addr, err := r.NodeService.AddressLookup(obj.To)
+	return addr, err
+}
+
 func (r *mutationResolver) CreateTodo(ctx context.Context, input model.NewTodo) (*model.Todo, error) {
 	todo := &model.Todo{
 		Text:   input.Text,
@@ -146,6 +156,11 @@ func (r *queryResolver) MessagesConfirmed(ctx context.Context, address *string, 
 	return items, nil
 }
 
+func (r *queryResolver) Address(ctx context.Context, str string) (*model.Address, error) {
+	addr, err := r.NodeService.AddressLookup(str)
+	return addr, err
+}
+
 func (r *queryResolver) Actor(ctx context.Context, address string) (*model.Actor, error) {
 	// TODO get this data from lily instead of the node
 	item, err := r.NodeService.GetActor(address)
@@ -203,6 +218,11 @@ func (r *todoResolver) Actor(ctx context.Context, obj *model.Todo) (*model.Actor
 // Message returns generated.MessageResolver implementation.
 func (r *Resolver) Message() generated.MessageResolver { return &messageResolver{r} }
 
+// MessageConfirmed returns generated.MessageConfirmedResolver implementation.
+func (r *Resolver) MessageConfirmed() generated.MessageConfirmedResolver {
+	return &messageConfirmedResolver{r}
+}
+
 // Mutation returns generated.MutationResolver implementation.
 func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
 
@@ -216,6 +236,7 @@ func (r *Resolver) Subscription() generated.SubscriptionResolver { return &subsc
 func (r *Resolver) Todo() generated.TodoResolver { return &todoResolver{r} }
 
 type messageResolver struct{ *Resolver }
+type messageConfirmedResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type subscriptionResolver struct{ *Resolver }

@@ -37,6 +37,7 @@ type Config struct {
 
 type ResolverRoot interface {
 	Message() MessageResolver
+	MessageConfirmed() MessageConfirmedResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
 	Subscription() SubscriptionResolver
@@ -58,7 +59,6 @@ type ComplexityRoot struct {
 	}
 
 	Address struct {
-		Actor  func(childComplexity int) int
 		ID     func(childComplexity int) int
 		Robust func(childComplexity int) int
 	}
@@ -128,6 +128,7 @@ type ComplexityRoot struct {
 	Query struct {
 		Actor             func(childComplexity int, address string) int
 		Actors            func(childComplexity int) int
+		Address           func(childComplexity int, str string) int
 		Message           func(childComplexity int, cid *string) int
 		Messages          func(childComplexity int, address *string, limit *int, offset *int) int
 		MessagesConfirmed func(childComplexity int, address *string, limit *int, offset *int) int
@@ -165,6 +166,10 @@ type MessageResolver interface {
 	To(ctx context.Context, obj *model.Message) (*model.Actor, error)
 	From(ctx context.Context, obj *model.Message) (*model.Actor, error)
 }
+type MessageConfirmedResolver interface {
+	From(ctx context.Context, obj *model.MessageConfirmed) (*model.Address, error)
+	To(ctx context.Context, obj *model.MessageConfirmed) (*model.Address, error)
+}
 type MutationResolver interface {
 	CreateTodo(ctx context.Context, input model.NewTodo) (*model.Todo, error)
 }
@@ -174,6 +179,7 @@ type QueryResolver interface {
 	Messages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.Message, error)
 	PendingMessages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessagePending, error)
 	MessagesConfirmed(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessageConfirmed, error)
+	Address(ctx context.Context, str string) (*model.Address, error)
 	Actor(ctx context.Context, address string) (*model.Actor, error)
 	Actors(ctx context.Context) ([]*model.Actor, error)
 }
@@ -253,13 +259,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Actor.StateRoot(childComplexity), true
-
-	case "Address.actor":
-		if e.complexity.Address.Actor == nil {
-			break
-		}
-
-		return e.complexity.Address.Actor(childComplexity), true
 
 	case "Address.id":
 		if e.complexity.Address.ID == nil {
@@ -649,6 +648,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.Actors(childComplexity), true
 
+	case "Query.address":
+		if e.complexity.Query.Address == nil {
+			break
+		}
+
+		args, err := ec.field_Query_address_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.Address(childComplexity, args["str"].(string)), true
+
 	case "Query.message":
 		if e.complexity.Query.Message == nil {
 			break
@@ -876,7 +887,7 @@ type Query {
     limit: Int = 5
     offset: Int = 0
   ): [MessageConfirmed!]! # lily
-  #address(str: String!): Address
+  address(str: String!): Address
   actor(address: String!): Actor
   actors: [Actor!]!
 }
@@ -970,7 +981,7 @@ type MessageConfirmed {
 type Address {
   id: ID!
   robust: String!
-  actor: Actor!
+  #actor: Actor!
 }
 
 type Actor {
@@ -1065,6 +1076,21 @@ func (ec *executionContext) field_Query_actor_args(ctx context.Context, rawArgs 
 		}
 	}
 	args["address"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_address_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["str"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("str"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["str"] = arg0
 	return args, nil
 }
 
@@ -1540,41 +1566,6 @@ func (ec *executionContext) _Address_robust(ctx context.Context, field graphql.C
 	res := resTmp.(string)
 	fc.Result = res
 	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Address_actor(ctx context.Context, field graphql.CollectedField, obj *model.Address) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Address",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Actor, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(*model.Actor)
-	fc.Result = res
-	return ec.marshalNActor2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐActor(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Message_cid(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
@@ -2130,14 +2121,14 @@ func (ec *executionContext) _MessageConfirmed_from(ctx context.Context, field gr
 		Object:     "MessageConfirmed",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.From, nil
+		return ec.resolvers.MessageConfirmed().From(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2165,14 +2156,14 @@ func (ec *executionContext) _MessageConfirmed_to(ctx context.Context, field grap
 		Object:     "MessageConfirmed",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.To, nil
+		return ec.resolvers.MessageConfirmed().To(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3499,6 +3490,45 @@ func (ec *executionContext) _Query_messagesConfirmed(ctx context.Context, field 
 	res := resTmp.([]*model.MessageConfirmed)
 	fc.Result = res
 	return ec.marshalNMessageConfirmed2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageConfirmedᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_address(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_address_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().Address(rctx, args["str"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Address)
+	fc.Result = res
+	return ec.marshalOAddress2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐAddress(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_actor(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -5242,11 +5272,6 @@ func (ec *executionContext) _Address(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		case "actor":
-			out.Values[i] = ec._Address_actor(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -5354,127 +5379,145 @@ func (ec *executionContext) _MessageConfirmed(ctx context.Context, sel ast.Selec
 		case "cid":
 			out.Values[i] = ec._MessageConfirmed_cid(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "height":
 			out.Values[i] = ec._MessageConfirmed_height(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "stateRoot":
 			out.Values[i] = ec._MessageConfirmed_stateRoot(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "version":
 			out.Values[i] = ec._MessageConfirmed_version(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "from":
-			out.Values[i] = ec._MessageConfirmed_from(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._MessageConfirmed_from(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
 		case "to":
-			out.Values[i] = ec._MessageConfirmed_to(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._MessageConfirmed_to(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
 		case "value":
 			out.Values[i] = ec._MessageConfirmed_value(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "gasFeeCap":
 			out.Values[i] = ec._MessageConfirmed_gasFeeCap(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "gasPremium":
 			out.Values[i] = ec._MessageConfirmed_gasPremium(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "gasLimit":
 			out.Values[i] = ec._MessageConfirmed_gasLimit(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "sizeBytes":
 			out.Values[i] = ec._MessageConfirmed_sizeBytes(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "nonce":
 			out.Values[i] = ec._MessageConfirmed_nonce(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "method":
 			out.Values[i] = ec._MessageConfirmed_method(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "actorName":
 			out.Values[i] = ec._MessageConfirmed_actorName(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "actorFamily":
 			out.Values[i] = ec._MessageConfirmed_actorFamily(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "exitCode":
 			out.Values[i] = ec._MessageConfirmed_exitCode(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "gasUsed":
 			out.Values[i] = ec._MessageConfirmed_gasUsed(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "parentBaseFee":
 			out.Values[i] = ec._MessageConfirmed_parentBaseFee(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "baseFeeBurn":
 			out.Values[i] = ec._MessageConfirmed_baseFeeBurn(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "overEstimationBurn":
 			out.Values[i] = ec._MessageConfirmed_overEstimationBurn(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "minerPenalty":
 			out.Values[i] = ec._MessageConfirmed_minerPenalty(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "minerTip":
 			out.Values[i] = ec._MessageConfirmed_minerTip(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "refund":
 			out.Values[i] = ec._MessageConfirmed_refund(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "gasRefund":
 			out.Values[i] = ec._MessageConfirmed_gasRefund(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "gasBurned":
 			out.Values[i] = ec._MessageConfirmed_gasBurned(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -5665,6 +5708,17 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				if res == graphql.Null {
 					atomic.AddUint32(&invalids, 1)
 				}
+				return res
+			})
+		case "address":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_address(ctx, field)
 				return res
 			})
 		case "actor":
@@ -6184,6 +6238,10 @@ func (ec *executionContext) marshalNActor2ᚖgithubᚗcomᚋglifioᚋgraphᚋgql
 		return graphql.Null
 	}
 	return ec._Actor(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNAddress2githubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐAddress(ctx context.Context, sel ast.SelectionSet, v model.Address) graphql.Marshaler {
+	return ec._Address(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNAddress2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐAddress(ctx context.Context, sel ast.SelectionSet, v *model.Address) graphql.Marshaler {
@@ -6850,6 +6908,13 @@ func (ec *executionContext) marshalOActor2ᚖgithubᚗcomᚋglifioᚋgraphᚋgql
 		return graphql.Null
 	}
 	return ec._Actor(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOAddress2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐAddress(ctx context.Context, sel ast.SelectionSet, v *model.Address) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Address(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOBoolean2bool(ctx context.Context, v interface{}) (bool, error) {

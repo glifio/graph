@@ -19,7 +19,7 @@ type Query {
     limit: Int = 5
     offset: Int = 0
   ): [MessageConfirmed!]! # lily
-  #address(str: String!): Address
+  address(str: String!): Address
   actor(address: String!): Actor
   actors: [Actor!]!
 }
@@ -113,7 +113,7 @@ type MessageConfirmed {
 type Address {
   id: ID!
   robust: String!
-  actor: Actor!
+  #actor: Actor!
 }
 
 type Actor {
