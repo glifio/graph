@@ -17,4 +17,5 @@ type Resolver struct{
 	NodeService node.NodeInterface
 	MessageService lily.MessageInterface
 	MessageConfirmedService lily.MessageConfirmedInterface
+	BlockService lily.BlockInterface
 }

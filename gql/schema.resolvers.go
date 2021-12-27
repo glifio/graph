@@ -64,6 +64,13 @@ func (r *messageConfirmedResolver) To(ctx context.Context, obj *model.MessageCon
 	return addr, err
 }
 
+func (r *messageConfirmedResolver) Block(ctx context.Context, obj *model.MessageConfirmed) (*model.Block, error) {
+	block, err := r.BlockService.GetByMessage(obj.Height, obj.Cid)
+	var item model.Block
+	copier.Copy(&item, &block)
+	return &item, err
+}
+
 func (r *mutationResolver) CreateTodo(ctx context.Context, input model.NewTodo) (*model.Todo, error) {
 	todo := &model.Todo{
 		Text:   input.Text,
@@ -76,6 +83,13 @@ func (r *mutationResolver) CreateTodo(ctx context.Context, input model.NewTodo) 
 
 func (r *queryResolver) Todos(ctx context.Context) ([]*model.Todo, error) {
 	panic(fmt.Errorf("not implemented"))
+}
+
+func (r *queryResolver) Block(ctx context.Context, address string, height int64) (*model.Block, error) {
+	block, err := r.BlockService.GetByMessage(height, address)
+	var item model.Block
+	copier.Copy(&item, &block)
+	return &item, err
 }
 
 func (r *queryResolver) Message(ctx context.Context, cid *string) (*model.MessageConfirmed, error) {

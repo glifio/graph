@@ -49,6 +49,8 @@ var daemonCmd = &cobra.Command{
 	messageService.Init(db)
 	messageConfirmedService := &postgres.MessageConfirmed{}
 	messageConfirmedService.Init(db)
+	blockService := &postgres.BlockHeader{}
+	blockService.Init(db)
 
 	router := chi.NewRouter()
 
@@ -60,7 +62,14 @@ var daemonCmd = &cobra.Command{
 		Debug:            true,
 	}).Handler)
 
-	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &graph.Resolver{NodeService: nodeService, MessageService: messageService, MessageConfirmedService: messageConfirmedService}}))
+	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{
+		Resolvers: &graph.Resolver{
+			NodeService: nodeService, 
+			MessageService: messageService, 
+			MessageConfirmedService: messageConfirmedService,
+			BlockService: blockService, 
+		},
+	}))
 
 	router.Handle("/", playground.Handler("GraphQL playground", "/query"))
 	router.Handle("/query", srv)

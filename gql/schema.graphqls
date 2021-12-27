@@ -7,6 +7,7 @@ scalar Uint64
 
 type Query {
   todos: [Todo!]!
+  block(address: String!, height: Int64!): Block!
   message(cid: String): MessageConfirmed!
   messages(address: String, limit: Int = 5, offset: Int = 0): [Message!]!
   pendingMessages(
@@ -108,6 +109,7 @@ type MessageConfirmed {
   refund: String!
   gasRefund: Int64!
   gasBurned: Int64!
+  block: Block!
 }
 
 type Address {
@@ -124,6 +126,18 @@ type Actor {
   Balance(unit: FilUnit = AttoFil): String!
   StateRoot: String!
   Height: String!
+}
+
+type Block {
+  Cid: String!
+  Height: Int64!
+  Miner: String!
+  ParentWeight: String!
+  ParentBaseFee: String!
+  ParentStateRoot: String!
+  WinCount: Int64
+  Timestamp: Uint64
+  ForkSignaling: Uint64
 }
 
 type User {

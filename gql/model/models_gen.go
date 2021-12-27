@@ -23,6 +23,18 @@ type Address struct {
 	Robust string `json:"robust"`
 }
 
+type Block struct {
+	Cid             string  `json:"Cid"`
+	Height          int64   `json:"Height"`
+	Miner           string  `json:"Miner"`
+	ParentWeight    string  `json:"ParentWeight"`
+	ParentBaseFee   string  `json:"ParentBaseFee"`
+	ParentStateRoot string  `json:"ParentStateRoot"`
+	WinCount        *int64  `json:"WinCount"`
+	Timestamp       *uint64 `json:"Timestamp"`
+	ForkSignaling   *uint64 `json:"ForkSignaling"`
+}
+
 type MessagePending struct {
 	Cid        string   `json:"cid"`
 	Version    *int     `json:"version"`
