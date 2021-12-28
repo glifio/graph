@@ -29,6 +29,7 @@ type MessageConfirmed struct {
 	SizeBytes          int      `json:"sizeBytes"`
 	Nonce              uint64   `json:"nonce"`
 	Method             uint64   `json:"method"`
+	MethodName         string   `json:"methodName"`
 	ActorName          string   `json:"actorName"`
 	ActorFamily        string   `json:"actorFamily"`
 	ExitCode           int64    `json:"exitCode"`

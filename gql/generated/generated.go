@@ -106,6 +106,7 @@ type ComplexityRoot struct {
 		GasUsed            func(childComplexity int) int
 		Height             func(childComplexity int) int
 		Method             func(childComplexity int) int
+		MethodName         func(childComplexity int) int
 		MinerPenalty       func(childComplexity int) int
 		MinerTip           func(childComplexity int) int
 		Nonce              func(childComplexity int) int
@@ -183,6 +184,8 @@ type MessageResolver interface {
 type MessageConfirmedResolver interface {
 	From(ctx context.Context, obj *model.MessageConfirmed) (*model.Address, error)
 	To(ctx context.Context, obj *model.MessageConfirmed) (*model.Address, error)
+
+	MethodName(ctx context.Context, obj *model.MessageConfirmed) (string, error)
 
 	Block(ctx context.Context, obj *model.MessageConfirmed) (*model.Block, error)
 }
@@ -542,6 +545,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.MessageConfirmed.Method(childComplexity), true
+
+	case "MessageConfirmed.methodName":
+		if e.complexity.MessageConfirmed.MethodName == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.MethodName(childComplexity), true
 
 	case "MessageConfirmed.minerPenalty":
 		if e.complexity.MessageConfirmed.MinerPenalty == nil {
@@ -1064,6 +1074,7 @@ type MessageConfirmed {
   sizeBytes: Int!
   nonce: Uint64!
   method: Uint64!
+  methodName: String!
   actorName: String!
   actorFamily: String!
   exitCode: Int64!
@@ -2866,6 +2877,41 @@ func (ec *executionContext) _MessageConfirmed_method(ctx context.Context, field 
 	res := resTmp.(uint64)
 	fc.Result = res
 	return ec.marshalNUint642uint64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_methodName(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.MessageConfirmed().MethodName(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MessageConfirmed_actorName(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
@@ -6037,6 +6083,20 @@ func (ec *executionContext) _MessageConfirmed(ctx context.Context, sel ast.Selec
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
+		case "methodName":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._MessageConfirmed_methodName(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
 		case "actorName":
 			out.Values[i] = ec._MessageConfirmed_actorName(ctx, field, obj)
 			if out.Values[i] == graphql.Null {

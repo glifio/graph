@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"github.com/filecoin-project/lily/model/blocks"
-	"github.com/go-pg/pg/extra/pgdebug"
 	_ "github.com/lib/pq"
 )
 
@@ -16,11 +15,6 @@ func (t *BlockHeader) Init(db Database) error {
 }
 
 func (t *BlockHeader) GetByMessage(height int64, id string) (*blocks.BlockHeader, error) {
-
-	t.db.Db.AddQueryHook(pgdebug.DebugHook{
-		// Print all queries.
-		Verbose: true,
-	})
 
 	var block []blocks.BlockHeader
 

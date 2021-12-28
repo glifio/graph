@@ -7,9 +7,12 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/filecoin-project/lily/model/derived"
+	"github.com/filecoin-project/specs-actors/actors/builtin"
 	"github.com/glifio/graph/gql/generated"
 	"github.com/glifio/graph/gql/model"
 	"github.com/glifio/graph/pkg/lily"
@@ -62,6 +65,29 @@ func (r *messageConfirmedResolver) From(ctx context.Context, obj *model.MessageC
 func (r *messageConfirmedResolver) To(ctx context.Context, obj *model.MessageConfirmed) (*model.Address, error) {
 	addr, err := r.NodeService.AddressLookup(obj.To)
 	return addr, err
+}
+
+func (r *messageConfirmedResolver) MethodName(ctx context.Context, obj *model.MessageConfirmed) (string, error) {
+	switch(strings.Split(obj.ActorName, "/")[2]){
+		case "account":
+			return reflect.ValueOf(&builtin.MethodsAccount).Elem().Type().Field(int(obj.Method)).Name, nil;
+		case "init":
+			return reflect.ValueOf(&builtin.MethodsInit).Elem().Type().Field(int(obj.Method)).Name, nil;
+		case "reward":
+			return reflect.ValueOf(&builtin.MethodsReward).Elem().Type().Field(int(obj.Method)).Name, nil;
+		case "multisig":
+			return reflect.ValueOf(&builtin.MethodsMultisig).Elem().Type().Field(int(obj.Method)).Name, nil;
+		case "paymentchannel":
+			return reflect.ValueOf(&builtin.MethodsPaych).Elem().Type().Field(int(obj.Method)).Name, nil;
+		case "storagemarket":
+			return reflect.ValueOf(&builtin.MethodsMarket).Elem().Type().Field(int(obj.Method)).Name, nil;
+		case "storageminer":
+			return reflect.ValueOf(&builtin.MethodsMiner).Elem().Type().Field(int(obj.Method)).Name, nil;
+		case "storagepower":
+			return reflect.ValueOf(&builtin.MethodsPower).Elem().Type().Field(int(obj.Method)).Name, nil;
+		default:
+			return "???", nil;
+	}
 }
 
 func (r *messageConfirmedResolver) Block(ctx context.Context, obj *model.MessageConfirmed) (*model.Block, error) {
@@ -189,7 +215,7 @@ func (r *queryResolver) Actor(ctx context.Context, address string) (*model.Actor
 			ID:      address,
 			Code:    item.Code.String(),
 			Head:    item.Head.String(),
-			Nonce:   strconv.FormatUint(item.Nonce, 64),
+			Nonce:   strconv.FormatUint(item.Nonce, 10),
 			Balance: item.Balance.String(),
 			// StateRoot: item.StateRoot,
 			// Height:    item.Height,

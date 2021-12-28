@@ -97,6 +97,7 @@ type MessageConfirmed {
   sizeBytes: Int!
   nonce: Uint64!
   method: Uint64!
+  methodName: String!
   actorName: String!
   actorFamily: String!
   exitCode: Int64!
