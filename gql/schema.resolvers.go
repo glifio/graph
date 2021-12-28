@@ -93,7 +93,11 @@ func (r *queryResolver) Block(ctx context.Context, address string, height int64)
 }
 
 func (r *queryResolver) Message(ctx context.Context, cid *string) (*model.MessageConfirmed, error) {
-	panic(fmt.Errorf("not implemented"))
+	//msg, err := r.NodeService.GetMessage(*cid)
+	msg, err := r.MessageConfirmedService.Get(*cid)
+	var item model.MessageConfirmed
+	copier.Copy(&item, &msg)
+	return &item, err
 }
 
 func (r *queryResolver) Messages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.Message, error) {

@@ -31,6 +31,6 @@ type MessageConfirmedItem struct {
 }
 
 type MessageConfirmedInterface interface {
-	Get(id string) (*MessageConfirmedItem, error)
+	Get(id string) (*derived.GasOutputs, error)
 	List(address *string, limit *int, offset *int) ([]derived.GasOutputs, error)
 }
