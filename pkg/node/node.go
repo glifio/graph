@@ -20,6 +20,7 @@ type NodeInterface interface {
 	GetPending() ([]*types.SignedMessage, error)
 	GetMessage(cidcc string) (*types.Message, error)
 	AddressLookup(id string) (*model.Address, error)
+	MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error)
 }
 
 type Node struct {
@@ -76,7 +77,19 @@ func (t *Node) GetMessage(id string) (*types.Message, error) {
 		log.Fatal(err)
 	}
 
-	fmt.Println("msg: ", msg.GasFeeCap)
+	return msg, nil
+}
+
+func (t *Node) StateSearchMsg(id string) (*lotusapi.MsgLookup, error){
+	c, err := cid.Decode(id)
+	if err != nil {
+		log.Fatal(err)
+	}
+	
+	msg, err := t.api.StateSearchMsg(context.Background(), types.EmptyTSK, c, 0, true )
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	return msg, nil
 }
@@ -93,6 +106,19 @@ func (t *Node) GetPendingMessages(id string) ([][]lotusapi.MessageCheckStatus, e
 		log.Fatal(err)
 	}
 	return status, nil
+}
+
+func (t *Node) MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error) {
+	res, err := address.NewFromString(addr)
+	if err != nil {
+		return nil, err
+	}
+	
+	pending, err := t.api.MsigGetPending(context.Background(), res, types.EmptyTSK)
+	if err != nil {
+		fmt.Println("get")
+	}
+	return pending, err
 }
 
 func (t *Node) GetPending() ([]*types.SignedMessage, error) {

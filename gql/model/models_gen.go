@@ -50,6 +50,15 @@ type MessagePending struct {
 	Params     *string  `json:"params"`
 }
 
+type MsigTransaction struct {
+	ID       int64    `json:"id"`
+	To       string   `json:"to"`
+	Value    string   `json:"value"`
+	Method   uint64   `json:"method"`
+	Params   *string  `json:"params"`
+	Approved []string `json:"approved"`
+}
+
 type NewTodo struct {
 	Text   string `json:"text"`
 	UserID string `json:"userId"`

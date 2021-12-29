@@ -136,6 +136,15 @@ type ComplexityRoot struct {
 		Version    func(childComplexity int) int
 	}
 
+	MsigTransaction struct {
+		Approved func(childComplexity int) int
+		ID       func(childComplexity int) int
+		Method   func(childComplexity int) int
+		Params   func(childComplexity int) int
+		To       func(childComplexity int) int
+		Value    func(childComplexity int) int
+	}
+
 	Mutation struct {
 		CreateTodo func(childComplexity int, input model.NewTodo) int
 	}
@@ -148,6 +157,7 @@ type ComplexityRoot struct {
 		Message           func(childComplexity int, cid *string) int
 		Messages          func(childComplexity int, address *string, limit *int, offset *int) int
 		MessagesConfirmed func(childComplexity int, address *string, limit *int, offset *int) int
+		MsigPending       func(childComplexity int, address *string, limit *int, offset *int) int
 		PendingMessages   func(childComplexity int, address *string, limit *int, offset *int) int
 		Todos             func(childComplexity int) int
 	}
@@ -203,6 +213,7 @@ type QueryResolver interface {
 	Address(ctx context.Context, str string) (*model.Address, error)
 	Actor(ctx context.Context, address string) (*model.Actor, error)
 	Actors(ctx context.Context) ([]*model.Actor, error)
+	MsigPending(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MsigTransaction, error)
 }
 type SubscriptionResolver interface {
 	Messages(ctx context.Context) (<-chan []*model.Message, error)
@@ -722,6 +733,48 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.MessagePending.Version(childComplexity), true
 
+	case "MsigTransaction.approved":
+		if e.complexity.MsigTransaction.Approved == nil {
+			break
+		}
+
+		return e.complexity.MsigTransaction.Approved(childComplexity), true
+
+	case "MsigTransaction.id":
+		if e.complexity.MsigTransaction.ID == nil {
+			break
+		}
+
+		return e.complexity.MsigTransaction.ID(childComplexity), true
+
+	case "MsigTransaction.method":
+		if e.complexity.MsigTransaction.Method == nil {
+			break
+		}
+
+		return e.complexity.MsigTransaction.Method(childComplexity), true
+
+	case "MsigTransaction.params":
+		if e.complexity.MsigTransaction.Params == nil {
+			break
+		}
+
+		return e.complexity.MsigTransaction.Params(childComplexity), true
+
+	case "MsigTransaction.to":
+		if e.complexity.MsigTransaction.To == nil {
+			break
+		}
+
+		return e.complexity.MsigTransaction.To(childComplexity), true
+
+	case "MsigTransaction.value":
+		if e.complexity.MsigTransaction.Value == nil {
+			break
+		}
+
+		return e.complexity.MsigTransaction.Value(childComplexity), true
+
 	case "Mutation.createTodo":
 		if e.complexity.Mutation.CreateTodo == nil {
 			break
@@ -812,6 +865,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.MessagesConfirmed(childComplexity, args["address"].(*string), args["limit"].(*int), args["offset"].(*int)), true
+
+	case "Query.msigPending":
+		if e.complexity.Query.MsigPending == nil {
+			break
+		}
+
+		args, err := ec.field_Query_msigPending_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.MsigPending(childComplexity, args["address"].(*string), args["limit"].(*int), args["offset"].(*int)), true
 
 	case "Query.pendingMessages":
 		if e.complexity.Query.PendingMessages == nil {
@@ -1008,6 +1073,11 @@ type Query {
   address(str: String!): Address
   actor(address: String!): Actor
   actors: [Actor!]!
+  msigPending(
+    address: String
+    limit: Int = 5
+    offset: Int = 0
+  ): [MsigTransaction!]!
 }
 
 type Mutation {
@@ -1097,6 +1167,15 @@ type MessageConfirmed {
   gasBurned: Int64!
   block: Block!
   params: String
+}
+
+type MsigTransaction {
+  id: Int64!
+  to: String!
+  value: String!
+  method: Uint64!
+  params: String
+  approved: [String!]
 }
 
 type Address {
@@ -1300,6 +1379,39 @@ func (ec *executionContext) field_Query_messagesConfirmed_args(ctx context.Conte
 }
 
 func (ec *executionContext) field_Query_messages_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["address"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["address"] = arg0
+	var arg1 *int
+	if tmp, ok := rawArgs["limit"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+		arg1, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["limit"] = arg1
+	var arg2 *int
+	if tmp, ok := rawArgs["offset"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("offset"))
+		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["offset"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_msigPending_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
 	var arg0 *string
@@ -3812,6 +3924,210 @@ func (ec *executionContext) _MessagePending_params(ctx context.Context, field gr
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _MsigTransaction_id(ctx context.Context, field graphql.CollectedField, obj *model.MsigTransaction) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MsigTransaction",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int64)
+	fc.Result = res
+	return ec.marshalNInt642int64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MsigTransaction_to(ctx context.Context, field graphql.CollectedField, obj *model.MsigTransaction) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MsigTransaction",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.To, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MsigTransaction_value(ctx context.Context, field graphql.CollectedField, obj *model.MsigTransaction) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MsigTransaction",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Value, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MsigTransaction_method(ctx context.Context, field graphql.CollectedField, obj *model.MsigTransaction) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MsigTransaction",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Method, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint64)
+	fc.Result = res
+	return ec.marshalNUint642uint64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MsigTransaction_params(ctx context.Context, field graphql.CollectedField, obj *model.MsigTransaction) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MsigTransaction",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Params, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MsigTransaction_approved(ctx context.Context, field graphql.CollectedField, obj *model.MsigTransaction) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MsigTransaction",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Approved, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]string)
+	fc.Result = res
+	return ec.marshalOString2ᚕstringᚄ(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Mutation_createTodo(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -4210,6 +4526,48 @@ func (ec *executionContext) _Query_actors(ctx context.Context, field graphql.Col
 	res := resTmp.([]*model.Actor)
 	fc.Result = res
 	return ec.marshalNActor2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐActorᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_msigPending(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_msigPending_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().MsigPending(rctx, args["address"].(*string), args["limit"].(*int), args["offset"].(*int))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*model.MsigTransaction)
+	fc.Result = res
+	return ec.marshalNMsigTransaction2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMsigTransactionᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -6289,6 +6647,52 @@ func (ec *executionContext) _MessagePending(ctx context.Context, sel ast.Selecti
 	return out
 }
 
+var msigTransactionImplementors = []string{"MsigTransaction"}
+
+func (ec *executionContext) _MsigTransaction(ctx context.Context, sel ast.SelectionSet, obj *model.MsigTransaction) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, msigTransactionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MsigTransaction")
+		case "id":
+			out.Values[i] = ec._MsigTransaction_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "to":
+			out.Values[i] = ec._MsigTransaction_to(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "value":
+			out.Values[i] = ec._MsigTransaction_value(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "method":
+			out.Values[i] = ec._MsigTransaction_method(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "params":
+			out.Values[i] = ec._MsigTransaction_params(ctx, field, obj)
+		case "approved":
+			out.Values[i] = ec._MsigTransaction_approved(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var mutationImplementors = []string{"Mutation"}
 
 func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -6450,6 +6854,20 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_actors(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
+		case "msigPending":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_msigPending(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&invalids, 1)
 				}
@@ -7218,6 +7636,60 @@ func (ec *executionContext) marshalNMessagePending2ᚖgithubᚗcomᚋglifioᚋgr
 	return ec._MessagePending(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNMsigTransaction2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMsigTransactionᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.MsigTransaction) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNMsigTransaction2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMsigTransaction(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNMsigTransaction2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMsigTransaction(ctx context.Context, sel ast.SelectionSet, v *model.MsigTransaction) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._MsigTransaction(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNNewTodo2githubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐNewTodo(ctx context.Context, v interface{}) (model.NewTodo, error) {
 	res, err := ec.unmarshalInputNewTodo(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -7764,6 +8236,48 @@ func (ec *executionContext) unmarshalOString2string(ctx context.Context, v inter
 
 func (ec *executionContext) marshalOString2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
 	return graphql.MarshalString(v)
+}
+
+func (ec *executionContext) unmarshalOString2ᚕstringᚄ(ctx context.Context, v interface{}) ([]string, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []interface{}
+	if v != nil {
+		if tmp1, ok := v.([]interface{}); ok {
+			vSlice = tmp1
+		} else {
+			vSlice = []interface{}{v}
+		}
+	}
+	var err error
+	res := make([]string, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNString2string(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalOString2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNString2string(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) unmarshalOString2ᚖstring(ctx context.Context, v interface{}) (*string, error) {

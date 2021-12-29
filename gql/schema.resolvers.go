@@ -248,6 +248,44 @@ func (r *queryResolver) Actors(ctx context.Context) ([]*model.Actor, error) {
 	// return items, nil
 }
 
+func (r *queryResolver) MsigPending(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MsigTransaction, error) {
+	var items []*model.MsigTransaction
+	//var rs []derived.GasOutputs
+	pending, err := r.NodeService.MsigGetPending(*address)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(pending) < *offset {
+		return nil, nil
+	}
+
+	for _, iter := range pending[*offset : min(*offset+*limit, len(pending))] {
+		var item model.MsigTransaction
+		item.ID = iter.ID
+		item.Method = uint64(iter.Method)
+		if iter.Params != nil {
+			*item.Params = string(iter.Params)
+		}
+		item.To = iter.To.String()
+		item.Value = iter.Value.String()
+		for _, appr := range iter.Approved {
+			//a, _ := r.NodeService.AddressLookup(appr.String())
+			item.Approved = append(item.Approved, appr.String())
+		}
+		//copier.Copy(&item, &r)
+		items = append(items, &item)
+	}
+	return items, nil
+}
+
+func min(a, b int) int {
+    if a < b {
+        return a
+    }
+    return b
+}
+
 func (r *subscriptionResolver) Messages(ctx context.Context) (<-chan []*model.Message, error) {
 	panic(fmt.Errorf("not implemented"))
 }

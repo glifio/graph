@@ -23,6 +23,11 @@ type Query {
   address(str: String!): Address
   actor(address: String!): Actor
   actors: [Actor!]!
+  msigPending(
+    address: String
+    limit: Int = 5
+    offset: Int = 0
+  ): [MsigTransaction!]!
 }
 
 type Mutation {
@@ -112,6 +117,15 @@ type MessageConfirmed {
   gasBurned: Int64!
   block: Block!
   params: String
+}
+
+type MsigTransaction {
+  id: Int64!
+  to: String!
+  value: String!
+  method: Uint64!
+  params: String
+  approved: [String!]
 }
 
 type Address {
