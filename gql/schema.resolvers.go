@@ -68,25 +68,25 @@ func (r *messageConfirmedResolver) To(ctx context.Context, obj *model.MessageCon
 }
 
 func (r *messageConfirmedResolver) MethodName(ctx context.Context, obj *model.MessageConfirmed) (string, error) {
-	switch(strings.Split(obj.ActorName, "/")[2]){
-		case "account":
-			return reflect.ValueOf(&builtin.MethodsAccount).Elem().Type().Field(int(obj.Method)).Name, nil;
-		case "init":
-			return reflect.ValueOf(&builtin.MethodsInit).Elem().Type().Field(int(obj.Method)).Name, nil;
-		case "reward":
-			return reflect.ValueOf(&builtin.MethodsReward).Elem().Type().Field(int(obj.Method)).Name, nil;
-		case "multisig":
-			return reflect.ValueOf(&builtin.MethodsMultisig).Elem().Type().Field(int(obj.Method)).Name, nil;
-		case "paymentchannel":
-			return reflect.ValueOf(&builtin.MethodsPaych).Elem().Type().Field(int(obj.Method)).Name, nil;
-		case "storagemarket":
-			return reflect.ValueOf(&builtin.MethodsMarket).Elem().Type().Field(int(obj.Method)).Name, nil;
-		case "storageminer":
-			return reflect.ValueOf(&builtin.MethodsMiner).Elem().Type().Field(int(obj.Method)).Name, nil;
-		case "storagepower":
-			return reflect.ValueOf(&builtin.MethodsPower).Elem().Type().Field(int(obj.Method)).Name, nil;
-		default:
-			return "???", nil;
+	switch strings.Split(obj.ActorName, "/")[2] {
+	case "account":
+		return reflect.ValueOf(&builtin.MethodsAccount).Elem().Type().Field(int(obj.Method)).Name, nil
+	case "init":
+		return reflect.ValueOf(&builtin.MethodsInit).Elem().Type().Field(int(obj.Method)).Name, nil
+	case "reward":
+		return reflect.ValueOf(&builtin.MethodsReward).Elem().Type().Field(int(obj.Method)).Name, nil
+	case "multisig":
+		return reflect.ValueOf(&builtin.MethodsMultisig).Elem().Type().Field(int(obj.Method)).Name, nil
+	case "paymentchannel":
+		return reflect.ValueOf(&builtin.MethodsPaych).Elem().Type().Field(int(obj.Method)).Name, nil
+	case "storagemarket":
+		return reflect.ValueOf(&builtin.MethodsMarket).Elem().Type().Field(int(obj.Method)).Name, nil
+	case "storageminer":
+		return reflect.ValueOf(&builtin.MethodsMiner).Elem().Type().Field(int(obj.Method)).Name, nil
+	case "storagepower":
+		return reflect.ValueOf(&builtin.MethodsPower).Elem().Type().Field(int(obj.Method)).Name, nil
+	default:
+		return "???", nil
 	}
 }
 
@@ -123,6 +123,7 @@ func (r *queryResolver) Message(ctx context.Context, cid *string) (*model.Messag
 	msg, err := r.MessageConfirmedService.Get(*cid)
 	var item model.MessageConfirmed
 	copier.Copy(&item, &msg)
+	item.Params = &msg.ParsedMessage.Params
 	return &item, err
 }
 

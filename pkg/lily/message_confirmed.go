@@ -1,36 +1,50 @@
 package lily
 
-import "github.com/filecoin-project/lily/model/derived"
+import (
+	"github.com/filecoin-project/lily/model/derived"
+)
 
-type MessageConfirmedItem struct {
-	Cid    string  `json:"cid"`
-	Height float64 `json:"height"`
-	From   string  `json:"from"`
-	To     string  `json:"to"`
-	Value  float64 `json:"value"`
-	Method string  `json:"method"`
-	Params *string `json:"params"`
-	GasFeeCap float64
-	GasPremium float64
-	GasLimit   string    
-	SizeBytes      string
-	Nonce          string
-	StateRoot        string
-	ExitCode       string
-	GasUsed          string
-	ParentBaseFee  float64
-	BaseFeeBurn    float64
-	OverEstimationBurn float64
-	MinerPenalty  float64
-	MinerTip     float64
-	Refund       float64
-	GasRefund        string 
-	GasBurned         string
-	ActorName     string
-	ActorFamily       string
+type GasOutputs struct {
+	//lint:ignore U1000 tableName is a convention used by go-pg
+	tableName          struct{} `pg:"derived_gas_outputs"`
+	Height             int64    `pg:",pk,use_zero,notnull"`
+	Cid                string   `pg:",pk,notnull"`
+	StateRoot          string   `pg:",pk,notnull"`
+	From               string   `pg:",notnull"`
+	To                 string   `pg:",notnull"`
+	Value              string   `pg:"type:numeric,notnull"`
+	GasFeeCap          string   `pg:"type:numeric,notnull"`
+	GasPremium         string   `pg:"type:numeric,notnull"`
+	GasLimit           int64    `pg:",use_zero,notnull"`
+	SizeBytes          int      `pg:",use_zero,notnull"`
+	Nonce              uint64   `pg:",use_zero,notnull"`
+	Method             uint64   `pg:",use_zero,notnull"`
+	ActorName          string   `pg:",notnull"`
+	ActorFamily        string   `pg:",notnull"`
+	ExitCode           int64    `pg:",use_zero,notnull"`
+	GasUsed            int64    `pg:",use_zero,notnull"`
+	ParentBaseFee      string   `pg:"type:numeric,notnull"`
+	BaseFeeBurn        string   `pg:"type:numeric,notnull"`
+	OverEstimationBurn string   `pg:"type:numeric,notnull"`
+	MinerPenalty       string   `pg:"type:numeric,notnull"`
+	MinerTip           string   `pg:"type:numeric,notnull"`
+	Refund             string   `pg:"type:numeric,notnull"`
+	GasRefund          int64    `pg:",use_zero,notnull"`
+	GasBurned          int64    `pg:",use_zero,notnull"`
+	ParsedMessage      *ParsedMessage   `pg:"rel:has-one"`
+}
+
+type ParsedMessage struct {
+	Height int64  `pg:",pk,notnull,use_zero"`
+	Cid    string `pg:",pk,notnull"`
+	From   string `pg:",notnull"`
+	To     string `pg:",notnull"`
+	Value  string `pg:"type:numeric,notnull"`
+	Method string `pg:",notnull"`
+	Params string `pg:",type:jsonb"`
 }
 
 type MessageConfirmedInterface interface {
-	Get(id string) (*derived.GasOutputs, error)
+	Get(id string) (*GasOutputs, error)
 	List(address *string, limit *int, offset *int) ([]derived.GasOutputs, error)
 }

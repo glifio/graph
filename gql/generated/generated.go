@@ -111,6 +111,7 @@ type ComplexityRoot struct {
 		MinerTip           func(childComplexity int) int
 		Nonce              func(childComplexity int) int
 		OverEstimationBurn func(childComplexity int) int
+		Params             func(childComplexity int) int
 		ParentBaseFee      func(childComplexity int) int
 		Refund             func(childComplexity int) int
 		SizeBytes          func(childComplexity int) int
@@ -580,6 +581,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.MessageConfirmed.OverEstimationBurn(childComplexity), true
+
+	case "MessageConfirmed.params":
+		if e.complexity.MessageConfirmed.Params == nil {
+			break
+		}
+
+		return e.complexity.MessageConfirmed.Params(childComplexity), true
 
 	case "MessageConfirmed.parentBaseFee":
 		if e.complexity.MessageConfirmed.ParentBaseFee == nil {
@@ -1088,6 +1096,7 @@ type MessageConfirmed {
   gasRefund: Int64!
   gasBurned: Int64!
   block: Block!
+  params: String
 }
 
 type Address {
@@ -3367,6 +3376,38 @@ func (ec *executionContext) _MessageConfirmed_block(ctx context.Context, field g
 	res := resTmp.(*model.Block)
 	fc.Result = res
 	return ec.marshalNBlock2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐBlock(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessageConfirmed_params(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessageConfirmed",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Params, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MessagePending_cid(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
@@ -6171,6 +6212,8 @@ func (ec *executionContext) _MessageConfirmed(ctx context.Context, sel ast.Selec
 				}
 				return res
 			})
+		case "params":
+			out.Values[i] = ec._MessageConfirmed_params(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}

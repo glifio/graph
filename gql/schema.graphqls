@@ -111,6 +111,7 @@ type MessageConfirmed {
   gasRefund: Int64!
   gasBurned: Int64!
   block: Block!
+  params: String
 }
 
 type Address {
