@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
 	graph "github.com/glifio/graph/gql"
 	"github.com/glifio/graph/gql/generated"
@@ -14,6 +15,7 @@ import (
 	"github.com/glifio/graph/pkg/node"
 	"github.com/glifio/graph/pkg/postgres"
 	"github.com/go-chi/chi"
+	"github.com/gorilla/websocket"
 	"github.com/rs/cors"
 	"github.com/spf13/cobra"
 )
@@ -70,6 +72,17 @@ var daemonCmd = &cobra.Command{
 			BlockService: blockService, 
 		},
 	}))
+	srv.AddTransport(&transport.Websocket{
+        Upgrader: websocket.Upgrader{
+            CheckOrigin: func(r *http.Request) bool {
+                // Check against your desired domains here
+                // return r.Host == "example.org"
+				 return r.Host == "*"
+            },
+            ReadBufferSize:  1024,
+            WriteBufferSize: 1024,
+        },
+    })
 
 	router.Handle("/", playground.Handler("GraphQL playground", "/query"))
 	router.Handle("/query", srv)

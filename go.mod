@@ -11,8 +11,8 @@ require (
 	github.com/filecoin-project/lotus v1.13.1
 	github.com/filecoin-project/specs-actors v0.9.14
 	github.com/go-chi/chi v1.5.4
-	github.com/go-pg/pg/extra/pgdebug v0.2.0
 	github.com/go-pg/pg/v10 v10.10.6
+	github.com/gorilla/websocket v1.4.2
 	github.com/ipfs/go-cid v0.1.0
 	github.com/jinzhu/copier v0.3.4
 	github.com/lib/pq v1.10.3
