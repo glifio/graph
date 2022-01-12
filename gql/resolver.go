@@ -24,13 +24,21 @@ type Sub struct {
 	}
 }
 
+type MpoolObserver struct {
+	channel <-chan api.MpoolUpdate
+	Observers map[uuid.UUID]struct {
+		address string
+		update chan *model.MpoolUpdate
+	}
+}
+
 type Resolver struct{
-	todos []*model.Todo
 	NodeService node.NodeInterface
 	MessageService lily.MessageInterface
 	MessageConfirmedService lily.MessageConfirmedInterface
 	BlockService lily.BlockInterface
 
 	ChainSubs *Sub
+	MpoolObserver *MpoolObserver
 	mu    sync.Mutex // nolint: structcheck
 }

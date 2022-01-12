@@ -6,7 +6,6 @@ package graph
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"reflect"
 	"strconv"
 	"strings"
@@ -20,44 +19,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jinzhu/copier"
 )
-
-func (r *messageResolver) To(ctx context.Context, obj *model.Message) (*model.Actor, error) {
-	address := obj.To
-	item, err := r.NodeService.GetActor(address)
-	if err != nil {
-		return nil, err
-	} else {
-		return &model.Actor{
-			ID:   address,
-			Code: item.Code.String(),
-			Head: item.Head.String(),
-			// StateRoot: item.StateRoot,
-			// Nonce:     item.Nonce,
-			// Height:    item.Height,
-			Balance: item.Balance.String(),
-		}, nil
-	}
-
-	//return &model.Actor{ID: obj.To, Code: "user1 " + obj.Cid}, nil
-}
-
-func (r *messageResolver) From(ctx context.Context, obj *model.Message) (*model.Actor, error) {
-	address := obj.From
-	item, err := r.NodeService.GetActor(address)
-	if err != nil {
-		return nil, err
-	} else {
-		return &model.Actor{
-			ID:   address,
-			Code: item.Code.String(),
-			Head: item.Head.String(),
-			// StateRoot: item.StateRoot,
-			// Nonce:     item.Nonce,
-			// Height:    item.Height,
-			Balance: item.Balance.String(),
-		}, nil
-	}
-}
 
 func (r *messageConfirmedResolver) From(ctx context.Context, obj *model.MessageConfirmed) (*model.Address, error) {
 	addr, err := r.NodeService.AddressLookup(obj.From)
@@ -99,20 +60,6 @@ func (r *messageConfirmedResolver) Block(ctx context.Context, obj *model.Message
 	return &item, err
 }
 
-func (r *mutationResolver) CreateTodo(ctx context.Context, input model.NewTodo) (*model.Todo, error) {
-	todo := &model.Todo{
-		Text:   input.Text,
-		ID:     fmt.Sprintf("T%d", rand.Int()),
-		UserID: input.UserID,
-	}
-	r.todos = append(r.todos, todo)
-	return todo, nil
-}
-
-func (r *queryResolver) Todos(ctx context.Context) ([]*model.Todo, error) {
-	panic(fmt.Errorf("not implemented"))
-}
-
 func (r *queryResolver) Block(ctx context.Context, address string, height int64) (*model.Block, error) {
 	block, err := r.BlockService.GetByMessage(height, address)
 	var item model.Block
@@ -144,7 +91,7 @@ func (r *queryResolver) Messages(ctx context.Context, address *string, limit *in
 		item.Height = savedItem.Height
 		item.From = savedItem.From
 		item.To = savedItem.To
-		item.Value = savedItem.Value
+		item.Value = strconv.FormatFloat(savedItem.Value,'f',-1,64)
 		item.Method = savedItem.Method
 		item.Params = savedItem.Params
 		items = append(items, &item)
@@ -338,7 +285,7 @@ func (r *subscriptionResolver) ChainHead(ctx context.Context) (<-chan *model.Cha
 	r.ChainSubs.Observers[id] = struct {
 		HeadChange chan *model.ChainHead
 	}{HeadChange: events}
-	if(r.ChainSubs.Height != 0){
+	if r.ChainSubs.Height != 0 {
 		events <- &model.ChainHead{Height: r.ChainSubs.Height}
 	}
 	fmt.Printf("add observer[%d]: %s\n", len(r.ChainSubs.Observers), id.String())
@@ -347,24 +294,86 @@ func (r *subscriptionResolver) ChainHead(ctx context.Context) (<-chan *model.Cha
 	return events, nil
 }
 
-func (r *todoResolver) User(ctx context.Context, obj *model.Todo) (*model.User, error) {
-	return &model.User{ID: obj.UserID, Name: "user " + obj.UserID}, nil
-}
+func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string) (<-chan *model.MpoolUpdate, error) {
+	if r.MpoolObserver == nil {
+		mpoolsub, err := r.NodeService.MpoolSub(context.TODO())
+		if err != nil {
+			return nil, err
+		}
 
-func (r *todoResolver) Actor(ctx context.Context, obj *model.Todo) (*model.Actor, error) {
-	panic(fmt.Errorf("not implemented"))
-}
+		r.MpoolObserver = &MpoolObserver{
+			channel: mpoolsub,
+			Observers: map[uuid.UUID]struct {
+				address string
+				update  chan *model.MpoolUpdate
+			}{},
+		}
 
-// Message returns generated.MessageResolver implementation.
-func (r *Resolver) Message() generated.MessageResolver { return &messageResolver{r} }
+		go func() {
+			fmt.Printf("create mpoolupdate listener\n")
+
+			for msg := range r.MpoolObserver.channel {
+				var res model.MpoolUpdate
+
+				res.Type = (*int)(&msg.Type)
+				res.Message = &model.Message{}
+				res.Message.Cid = msg.Message.Cid().String()
+				res.Message.Version = &msg.Message.Message.Version
+				res.Message.From = msg.Message.Message.From.String()
+				res.Message.To = msg.Message.Message.To.String()
+				res.Message.Nonce = &msg.Message.Message.Nonce
+				res.Message.Value = msg.Message.Message.Value.String()
+				res.Message.GasLimit = &msg.Message.Message.GasLimit
+				gasfeecap := msg.Message.Message.GasFeeCap.String()
+				res.Message.GasFeeCap = &gasfeecap
+				gaspremium := msg.Message.Message.GasPremium.String()
+				res.Message.GasPremium = &gaspremium
+				res.Message.Method = msg.Message.Message.Method.String()
+				// if msg.Message.Message.Params != nil {
+				// 	params := string(msg.Message.Message.Params)
+				// 	res.Message.Params = &params
+				// }
+
+				r.mu.Lock()
+				for _, observer := range r.MpoolObserver.Observers {
+					fmt.Printf("address: %s\n", *address)
+					if res.Message.From == observer.address || res.Message.To == observer.address {
+						observer.update <- &res
+					}
+				}
+				r.mu.Unlock()
+			}
+			fmt.Printf("delete listen\n")
+		}()
+	}
+
+	id := uuid.New()
+	events := make(chan *model.MpoolUpdate, 1)
+
+	go func() {
+		<-ctx.Done()
+		r.mu.Lock()
+		delete(r.MpoolObserver.Observers, id)
+		fmt.Printf("delete observer[%d]: %s\n", len(r.MpoolObserver.Observers), id.String())
+		r.mu.Unlock()
+	}()
+
+	r.mu.Lock()
+	r.MpoolObserver.Observers[id] = struct {
+		address string
+		update  chan *model.MpoolUpdate
+	}{address: *address, update: events}
+	//events <- &model.MpoolUpdate{Height: r.ChainSubs.Height}
+	fmt.Printf("add observer[%d]: %s\n", len(r.MpoolObserver.Observers), id.String())
+	r.mu.Unlock()
+
+	return events, nil
+}
 
 // MessageConfirmed returns generated.MessageConfirmedResolver implementation.
 func (r *Resolver) MessageConfirmed() generated.MessageConfirmedResolver {
 	return &messageConfirmedResolver{r}
 }
-
-// Mutation returns generated.MutationResolver implementation.
-func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
 
 // Query returns generated.QueryResolver implementation.
 func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
@@ -372,12 +381,6 @@ func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 // Subscription returns generated.SubscriptionResolver implementation.
 func (r *Resolver) Subscription() generated.SubscriptionResolver { return &subscriptionResolver{r} }
 
-// Todo returns generated.TodoResolver implementation.
-func (r *Resolver) Todo() generated.TodoResolver { return &todoResolver{r} }
-
-type messageResolver struct{ *Resolver }
 type messageConfirmedResolver struct{ *Resolver }
-type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type subscriptionResolver struct{ *Resolver }
-type todoResolver struct{ *Resolver }

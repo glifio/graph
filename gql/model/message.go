@@ -2,14 +2,14 @@ package model
 
 type Message struct {
 	Cid        string  `json:"cid"`
-	Version    *int    `json:"version"`
-	From   	   string  `json:"from"`
+	Version    *uint64 `json:"version"`
 	To         string  `json:"to"`
-	Nonce      *string `json:"Nonce"`
-	Value      float64 `json:"value"`
-	GasLimit   *string `json:"GasLimit"`
-	GasFeeCap  *string `json:"GasFeeCap"`
-	GasPremium *string `json:"GasPremium"`
+	From       string  `json:"from"`
+	Nonce      *uint64 `json:"nonce"`
+	Value      string  `json:"value"`
+	GasLimit   *int64  `json:"gasLimit"`
+	GasFeeCap  *string `json:"gasFeeCap"`
+	GasPremium *string `json:"gasPremium"`
 	Method     string  `json:"method"`
 	Height     float64 `json:"height"`
 	Params     *string `json:"params"`

@@ -6,7 +6,6 @@ scalar Int64
 scalar Uint64
 
 type Query {
-  todos: [Todo!]!
   block(address: String!, height: Int64!): Block!
   message(cid: String): MessageConfirmed!
   messages(address: String, limit: Int = 5, offset: Int = 0): [Message!]!
@@ -30,13 +29,10 @@ type Query {
   ): [MsigTransaction!]!
 }
 
-type Mutation {
-  createTodo(input: NewTodo!): Todo!
-}
-
 type Subscription {
   messages: [Message!]
   chainHead: ChainHead!
+  mpoolUpdate(address: String): MpoolUpdate!
 }
 
 # Units of height
@@ -52,29 +48,26 @@ type ChainHead {
   height: Int64!
 }
 
+type MpoolUpdate {
+  type: Int
+  message: Message!
+}
+
 type TipSet {
   cids: [String!]
   blks: [Block!]
   height: Uint64
 }
 
-type Todo {
-  id: ID!
-  text: String!
-  done: Boolean!
-  user: User!
-  actor: Actor!
-}
-
 type Message {
   cid: String!
-  version: Int
-  to: Actor!
-  from: Actor!
-  nonce: String
+  version: Uint64
+  to: String!
+  from: String!
+  nonce: Uint64
   #value(unit: FilUnit = AttoFil): Float!
-  value: Float!
-  gasLimit: String
+  value: String!
+  gasLimit: Int64
   gasFeeCap: String
   gasPremium: String
   method: String!
@@ -167,20 +160,6 @@ type Block {
   ForkSignaling: Uint64
 }
 
-type User {
-  id: ID!
-  name: String!
-}
-
 type QueryMessage {
   messages: [Message!]!
-}
-
-type QueryUser {
-  users: [User!]!
-}
-
-input NewTodo {
-  text: String!
-  userId: String!
 }

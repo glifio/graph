@@ -54,6 +54,11 @@ type MessagePending struct {
 	Params     *string  `json:"params"`
 }
 
+type MpoolUpdate struct {
+	Type    *int     `json:"type"`
+	Message *Message `json:"message"`
+}
+
 type MsigTransaction struct {
 	ID       int64    `json:"id"`
 	To       string   `json:"to"`
@@ -63,28 +68,14 @@ type MsigTransaction struct {
 	Approved []string `json:"approved"`
 }
 
-type NewTodo struct {
-	Text   string `json:"text"`
-	UserID string `json:"userId"`
-}
-
 type QueryMessage struct {
 	Messages []*Message `json:"messages"`
-}
-
-type QueryUser struct {
-	Users []*User `json:"users"`
 }
 
 type TipSet struct {
 	Cids   []string `json:"cids"`
 	Blks   []*Block `json:"blks"`
 	Height *uint64  `json:"height"`
-}
-
-type User struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
 }
 
 type FilUnit string

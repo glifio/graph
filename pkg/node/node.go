@@ -24,6 +24,7 @@ type NodeInterface interface {
 	AddressLookup(id string) (*model.Address, error)
 	MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error)
 	ChainHeadSub(ctx context.Context) (<-chan []*lotusapi.HeadChange, error)
+	MpoolSub(ctx context.Context) (<-chan lotusapi.MpoolUpdate, error)
 }
 
 type Node struct {
@@ -143,6 +144,14 @@ func (t *Node) ChainHeadSub(ctx context.Context) (<-chan []*lotusapi.HeadChange,
 		log.Fatal(err)
 	}
 	return headchange, err
+}
+
+func (t *Node) MpoolSub(ctx context.Context) (<-chan lotusapi.MpoolUpdate, error) {
+	mpool, err := t.api.MpoolSub(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return mpool, err
 }
 
 func (t *Node) GetPending() ([]*types.SignedMessage, error) {
