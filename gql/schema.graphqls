@@ -36,6 +36,7 @@ type Mutation {
 
 type Subscription {
   messages: [Message!]
+  chainHead: ChainHead!
 }
 
 # Units of height
@@ -45,6 +46,16 @@ enum FilUnit {
   FemtoFil
   PicoFil
   NanoFil
+}
+
+type ChainHead {
+  height: Int64!
+}
+
+type TipSet {
+  cids: [String!]
+  blks: [Block!]
+  height: Uint64
 }
 
 type Todo {

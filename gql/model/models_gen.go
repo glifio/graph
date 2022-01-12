@@ -35,6 +35,10 @@ type Block struct {
 	ForkSignaling   *uint64 `json:"ForkSignaling"`
 }
 
+type ChainHead struct {
+	Height int64 `json:"height"`
+}
+
 type MessagePending struct {
 	Cid        string   `json:"cid"`
 	Version    *int     `json:"version"`
@@ -70,6 +74,12 @@ type QueryMessage struct {
 
 type QueryUser struct {
 	Users []*User `json:"users"`
+}
+
+type TipSet struct {
+	Cids   []string `json:"cids"`
+	Blks   []*Block `json:"blks"`
+	Height *uint64  `json:"height"`
 }
 
 type User struct {

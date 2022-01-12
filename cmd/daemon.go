@@ -42,7 +42,7 @@ var daemonCmd = &cobra.Command{
 	defer db.Close()
 
 	nodeService := &node.Node{}
-	nodeService.Connect(config.LotusAddress)
+	nodeService.Connect(config.LotusAddress, config.LotusToken)
 	defer nodeService.Close()
 
 	// actorService := &postgres.Actor{}
@@ -61,7 +61,7 @@ var daemonCmd = &cobra.Command{
 	router.Use(cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"},
 		AllowCredentials: true,
-		Debug:            true,
+		Debug:            false,
 	}).Handler)
 
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{

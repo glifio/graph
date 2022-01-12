@@ -15,7 +15,9 @@ import (
 	"github.com/filecoin-project/specs-actors/actors/builtin"
 	"github.com/glifio/graph/gql/generated"
 	"github.com/glifio/graph/gql/model"
+	util "github.com/glifio/graph/internal/utils"
 	"github.com/glifio/graph/pkg/lily"
+	"github.com/google/uuid"
 	"github.com/jinzhu/copier"
 )
 
@@ -260,7 +262,7 @@ func (r *queryResolver) MsigPending(ctx context.Context, address *string, limit 
 		return nil, nil
 	}
 
-	for _, iter := range pending[*offset : min(*offset+*limit, len(pending))] {
+	for _, iter := range pending[*offset:util.Min(*offset+*limit, len(pending))] {
 		var item model.MsigTransaction
 		item.ID = iter.ID
 		item.Method = uint64(iter.Method)
@@ -279,15 +281,70 @@ func (r *queryResolver) MsigPending(ctx context.Context, address *string, limit 
 	return items, nil
 }
 
-func min(a, b int) int {
-    if a < b {
-        return a
-    }
-    return b
-}
-
 func (r *subscriptionResolver) Messages(ctx context.Context) (<-chan []*model.Message, error) {
 	panic(fmt.Errorf("not implemented"))
+}
+
+func (r *subscriptionResolver) ChainHead(ctx context.Context) (<-chan *model.ChainHead, error) {
+	if r.ChainSubs == nil {
+		chain, err := r.NodeService.ChainHeadSub(context.TODO())
+		if err != nil {
+			return nil, err
+		}
+
+		r.ChainSubs = &Sub{
+			Headchange: chain,
+			Height:     0,
+			Observers: map[uuid.UUID]struct {
+				HeadChange chan *model.ChainHead
+			}{},
+		}
+
+		go func() {
+			fmt.Printf("create chainhead listener\n")
+			var current int64
+
+			for headchanges := range r.ChainSubs.Headchange {
+				var res *model.ChainHead
+				for _, elem := range headchanges {
+					current = int64(elem.Val.Height())
+					res = &model.ChainHead{Height: int64(elem.Val.Height())}
+				}
+				if current > r.ChainSubs.Height {
+					r.ChainSubs.Height = current
+					r.mu.Lock()
+					for _, observer := range r.ChainSubs.Observers {
+						observer.HeadChange <- res
+					}
+					r.mu.Unlock()
+				}
+			}
+			fmt.Printf("delete listen\n")
+		}()
+	}
+
+	id := uuid.New()
+	events := make(chan *model.ChainHead, 1)
+
+	go func() {
+		<-ctx.Done()
+		r.mu.Lock()
+		delete(r.ChainSubs.Observers, id)
+		fmt.Printf("delete observer[%d]: %s\n", len(r.ChainSubs.Observers), id.String())
+		r.mu.Unlock()
+	}()
+
+	r.mu.Lock()
+	r.ChainSubs.Observers[id] = struct {
+		HeadChange chan *model.ChainHead
+	}{HeadChange: events}
+	if(r.ChainSubs.Height != 0){
+		events <- &model.ChainHead{Height: r.ChainSubs.Height}
+	}
+	fmt.Printf("add observer[%d]: %s\n", len(r.ChainSubs.Observers), id.String())
+	r.mu.Unlock()
+
+	return events, nil
 }
 
 func (r *todoResolver) User(ctx context.Context, obj *model.Todo) (*model.User, error) {

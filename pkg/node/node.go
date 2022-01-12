@@ -8,7 +8,9 @@ import (
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-jsonrpc"
+	"github.com/filecoin-project/lotus/api"
 	lotusapi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/api/v1api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/glifio/graph/gql/model"
 	"github.com/ipfs/go-cid"
@@ -21,19 +23,28 @@ type NodeInterface interface {
 	GetMessage(cidcc string) (*types.Message, error)
 	AddressLookup(id string) (*model.Address, error)
 	MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error)
+	ChainHeadSub(ctx context.Context) (<-chan []*lotusapi.HeadChange, error)
 }
 
 type Node struct {
-	api lotusapi.FullNodeStruct
+	//api1 lotusapi.FullNodeStruct
 	closer jsonrpc.ClientCloser
+	api v1api.FullNodeStruct
 }
 
-func (t *Node) Connect(address string){
-	authToken := "<value found in ~/.lotus/token>"
-	headers := http.Header{"Authorization": []string{"Bearer " + authToken}}
+func (t *Node) Connect(address string, token string){
+	head := http.Header{}
+
+	if token != "" {
+		head.Set("Authorization","Bearer " + token)
+	}
 
 	var err error
-	t.closer, err = jsonrpc.NewMergeClient(context.Background(), address + "/rpc/v0", "Filecoin", []interface{}{&t.api.Internal, &t.api.CommonStruct.Internal}, headers)
+	t.closer, err = jsonrpc.NewMergeClient(context.Background(), 
+		address, 
+		"Filecoin", 
+		api.GetInternalStructs(&t.api), 
+		head)
 	if err != nil {
 		log.Fatalf("connecting with lotus failed: %s", err)
 	}
@@ -121,13 +132,26 @@ func (t *Node) MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error) 
 	return pending, err
 }
 
+func (t *Node) ChainHead(ctx context.Context) (*types.TipSet, error) {
+	tipset, err := t.api.ChainHead(ctx)
+	return tipset, err
+}
+
+func (t *Node) ChainHeadSub(ctx context.Context) (<-chan []*lotusapi.HeadChange, error) {
+	headchange, err := t.api.ChainNotify(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return headchange, err
+}
+
 func (t *Node) GetPending() ([]*types.SignedMessage, error) {
 
 	tipset, err := t.api.ChainHead(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	status, err := t.api.MpoolPending(context.Background(), tipset.Key())
 	if err != nil {
 		log.Fatal(err)

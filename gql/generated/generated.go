@@ -75,6 +75,10 @@ type ComplexityRoot struct {
 		WinCount        func(childComplexity int) int
 	}
 
+	ChainHead struct {
+		Height func(childComplexity int) int
+	}
+
 	Message struct {
 		Cid        func(childComplexity int) int
 		From       func(childComplexity int) int
@@ -171,7 +175,14 @@ type ComplexityRoot struct {
 	}
 
 	Subscription struct {
-		Messages func(childComplexity int) int
+		ChainHead func(childComplexity int) int
+		Messages  func(childComplexity int) int
+	}
+
+	TipSet struct {
+		Blks   func(childComplexity int) int
+		Cids   func(childComplexity int) int
+		Height func(childComplexity int) int
 	}
 
 	Todo struct {
@@ -217,6 +228,7 @@ type QueryResolver interface {
 }
 type SubscriptionResolver interface {
 	Messages(ctx context.Context) (<-chan []*model.Message, error)
+	ChainHead(ctx context.Context) (<-chan *model.ChainHead, error)
 }
 type TodoResolver interface {
 	User(ctx context.Context, obj *model.Todo) (*model.User, error)
@@ -368,6 +380,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Block.WinCount(childComplexity), true
+
+	case "ChainHead.height":
+		if e.complexity.ChainHead.Height == nil {
+			break
+		}
+
+		return e.complexity.ChainHead.Height(childComplexity), true
 
 	case "Message.cid":
 		if e.complexity.Message.Cid == nil {
@@ -911,12 +930,40 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.QueryUser.Users(childComplexity), true
 
+	case "Subscription.chainHead":
+		if e.complexity.Subscription.ChainHead == nil {
+			break
+		}
+
+		return e.complexity.Subscription.ChainHead(childComplexity), true
+
 	case "Subscription.messages":
 		if e.complexity.Subscription.Messages == nil {
 			break
 		}
 
 		return e.complexity.Subscription.Messages(childComplexity), true
+
+	case "TipSet.blks":
+		if e.complexity.TipSet.Blks == nil {
+			break
+		}
+
+		return e.complexity.TipSet.Blks(childComplexity), true
+
+	case "TipSet.cids":
+		if e.complexity.TipSet.Cids == nil {
+			break
+		}
+
+		return e.complexity.TipSet.Cids(childComplexity), true
+
+	case "TipSet.height":
+		if e.complexity.TipSet.Height == nil {
+			break
+		}
+
+		return e.complexity.TipSet.Height(childComplexity), true
 
 	case "Todo.actor":
 		if e.complexity.Todo.Actor == nil {
@@ -1086,6 +1133,7 @@ type Mutation {
 
 type Subscription {
   messages: [Message!]
+  chainHead: ChainHead!
 }
 
 # Units of height
@@ -1095,6 +1143,16 @@ enum FilUnit {
   FemtoFil
   PicoFil
   NanoFil
+}
+
+type ChainHead {
+  height: Int64!
+}
+
+type TipSet {
+  cids: [String!]
+  blks: [Block!]
+  height: Uint64
 }
 
 type Todo {
@@ -2141,6 +2199,41 @@ func (ec *executionContext) _Block_ForkSignaling(ctx context.Context, field grap
 	res := resTmp.(*uint64)
 	fc.Result = res
 	return ec.marshalOUint642ᚖuint64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _ChainHead_height(ctx context.Context, field graphql.CollectedField, obj *model.ChainHead) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ChainHead",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Height, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int64)
+	fc.Result = res
+	return ec.marshalNInt642int64(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Message_cid(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
@@ -4753,6 +4846,147 @@ func (ec *executionContext) _Subscription_messages(ctx context.Context, field gr
 	}
 }
 
+func (ec *executionContext) _Subscription_chainHead(ctx context.Context, field graphql.CollectedField) (ret func() graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = nil
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Subscription().ChainHead(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return nil
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return nil
+	}
+	return func() graphql.Marshaler {
+		res, ok := <-resTmp.(<-chan *model.ChainHead)
+		if !ok {
+			return nil
+		}
+		return graphql.WriterFunc(func(w io.Writer) {
+			w.Write([]byte{'{'})
+			graphql.MarshalString(field.Alias).MarshalGQL(w)
+			w.Write([]byte{':'})
+			ec.marshalNChainHead2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐChainHead(ctx, field.Selections, res).MarshalGQL(w)
+			w.Write([]byte{'}'})
+		})
+	}
+}
+
+func (ec *executionContext) _TipSet_cids(ctx context.Context, field graphql.CollectedField, obj *model.TipSet) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TipSet",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cids, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]string)
+	fc.Result = res
+	return ec.marshalOString2ᚕstringᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TipSet_blks(ctx context.Context, field graphql.CollectedField, obj *model.TipSet) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TipSet",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Blks, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*model.Block)
+	fc.Result = res
+	return ec.marshalOBlock2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐBlockᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TipSet_height(ctx context.Context, field graphql.CollectedField, obj *model.TipSet) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TipSet",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Height, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*uint64)
+	fc.Result = res
+	return ec.marshalOUint642ᚖuint64(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Todo_id(ctx context.Context, field graphql.CollectedField, obj *model.Todo) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -6306,6 +6540,33 @@ func (ec *executionContext) _Block(ctx context.Context, sel ast.SelectionSet, ob
 	return out
 }
 
+var chainHeadImplementors = []string{"ChainHead"}
+
+func (ec *executionContext) _ChainHead(ctx context.Context, sel ast.SelectionSet, obj *model.ChainHead) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, chainHeadImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ChainHead")
+		case "height":
+			out.Values[i] = ec._ChainHead_height(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var messageImplementors = []string{"Message"}
 
 func (ec *executionContext) _Message(ctx context.Context, sel ast.SelectionSet, obj *model.Message) graphql.Marshaler {
@@ -6957,9 +7218,39 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 	switch fields[0].Name {
 	case "messages":
 		return ec._Subscription_messages(ctx, fields[0])
+	case "chainHead":
+		return ec._Subscription_chainHead(ctx, fields[0])
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}
+}
+
+var tipSetImplementors = []string{"TipSet"}
+
+func (ec *executionContext) _TipSet(ctx context.Context, sel ast.SelectionSet, obj *model.TipSet) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, tipSetImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TipSet")
+		case "cids":
+			out.Values[i] = ec._TipSet_cids(ctx, field, obj)
+		case "blks":
+			out.Values[i] = ec._TipSet_blks(ctx, field, obj)
+		case "height":
+			out.Values[i] = ec._TipSet_height(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
 }
 
 var todoImplementors = []string{"Todo"}
@@ -7408,6 +7699,20 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNChainHead2githubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐChainHead(ctx context.Context, sel ast.SelectionSet, v model.ChainHead) graphql.Marshaler {
+	return ec._ChainHead(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNChainHead2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐChainHead(ctx context.Context, sel ast.SelectionSet, v *model.ChainHead) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._ChainHead(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNFloat2float64(ctx context.Context, v interface{}) (float64, error) {
@@ -8110,6 +8415,53 @@ func (ec *executionContext) marshalOAddress2ᚖgithubᚗcomᚋglifioᚋgraphᚋg
 		return graphql.Null
 	}
 	return ec._Address(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOBlock2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐBlockᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Block) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNBlock2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐBlock(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) unmarshalOBoolean2bool(ctx context.Context, v interface{}) (bool, error) {
