@@ -27,6 +27,7 @@ type Query {
     limit: Int = 5
     offset: Int = 0
   ): [MsigTransaction!]!
+  stateListMessages(address: String!): [MessageConfirmed]
 }
 
 type Subscription {

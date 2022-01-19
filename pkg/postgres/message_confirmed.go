@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"github.com/filecoin-project/lily/model/derived"
+	"github.com/glifio/graph/gql/model"
 	"github.com/glifio/graph/pkg/lily"
 	_ "github.com/lib/pq"
 )
@@ -41,6 +42,24 @@ func (t *MessageConfirmed) List(address *string, limit *int, offset *int) ([]der
     var err = t.db.Db.Model(&msgs).
 		Where("gas_outputs.from = ?", *address).
 		WhereOr("gas_outputs.to = ?", *address).
+		Limit(*limit).
+		Offset(*offset).
+		Select()
+	if err != nil {
+		return nil, err
+	}
+
+	return msgs, nil
+}
+
+func (t *MessageConfirmed) Search(address *model.Address, limit *int, offset *int) ([]derived.GasOutputs, error) {
+	// Select messages
+    var msgs []derived.GasOutputs
+    var err = t.db.Db.Model(&msgs).
+		Where("gas_outputs.from = ?", address.ID).
+		WhereOr("gas_outputs.from = ?", address.Robust).
+		WhereOr("gas_outputs.to = ?", address.ID).
+		WhereOr("gas_outputs.to = ?", address.Robust).
 		Limit(*limit).
 		Offset(*offset).
 		Select()

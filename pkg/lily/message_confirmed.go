@@ -2,6 +2,7 @@ package lily
 
 import (
 	"github.com/filecoin-project/lily/model/derived"
+	"github.com/glifio/graph/gql/model"
 )
 
 type GasOutputs struct {
@@ -47,4 +48,5 @@ type ParsedMessage struct {
 type MessageConfirmedInterface interface {
 	Get(id string) (*GasOutputs, error)
 	List(address *string, limit *int, offset *int) ([]derived.GasOutputs, error)
+	Search(address *model.Address, limit *int, offset *int) ([]derived.GasOutputs, error)
 }

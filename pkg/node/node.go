@@ -21,8 +21,15 @@ type NodeInterface interface {
 	GetPendingMessages(id string) ([][]lotusapi.MessageCheckStatus, error)
 	GetPending() ([]*types.SignedMessage, error)
 	GetMessage(cidcc string) (*types.Message, error)
+	StateSearchMsg(id string) (*lotusapi.MsgLookup, error)
 	AddressLookup(id string) (*model.Address, error)
 	MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error)
+	//StateListMessages(ctx context.Context, fromto string)([]cid.Cid, error)
+	StateListMessages(ctx context.Context, addr string)([]*lotusapi.InvocResult, error)
+
+
+
+
 	ChainHeadSub(ctx context.Context) (<-chan []*lotusapi.HeadChange, error)
 	MpoolSub(ctx context.Context) (<-chan lotusapi.MpoolUpdate, error)
 }
@@ -33,21 +40,31 @@ type Node struct {
 	api v1api.FullNodeStruct
 }
 
-func (t *Node) Connect(address string, token string){
+func (t *Node) Connect(address1 string, token string){
 	head := http.Header{}
 
 	if token != "" {
 		head.Set("Authorization","Bearer " + token)
 	}
-
+	
 	var err error
 	t.closer, err = jsonrpc.NewMergeClient(context.Background(), 
-		address, 
+		address1, 
 		"Filecoin", 
 		api.GetInternalStructs(&t.api), 
 		head)
 	if err != nil {
 		log.Fatalf("connecting with lotus failed: %s", err)
+	}
+
+	name, _ := t.api.StateNetworkName(context.Background())
+	fmt.Println("network name: ", name)
+	if name == "mainnet" {
+		address.CurrentNetwork = address.Mainnet
+		fmt.Println("address network : mainnet")
+	} else {
+		address.CurrentNetwork = address.Testnet
+		fmt.Println("address network : testnet")
 	}
 }
 
@@ -99,11 +116,8 @@ func (t *Node) StateSearchMsg(id string) (*lotusapi.MsgLookup, error){
 	}
 	
 	msg, err := t.api.StateSearchMsg(context.Background(), types.EmptyTSK, c, 0, true )
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	return msg, nil
+	return msg, err
 }
 
 func (t *Node) GetPendingMessages(id string) ([][]lotusapi.MessageCheckStatus, error) {
@@ -131,6 +145,51 @@ func (t *Node) MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error) 
 		fmt.Println("get")
 	}
 	return pending, err
+}
+
+func (t *Node) StateListMessages(ctx context.Context, addr string)([]*lotusapi.InvocResult, error){
+	var out []cid.Cid
+	tipset, err := t.api.ChainHead(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	robust, _ := t.AddressGetRobust(addr)	
+	id, _ := t.AddressGetID(addr)
+
+	res, err := t.api.StateListMessages(ctx, &lotusapi.MessageMatch{From: id}, tipset.Key(), tipset.Height()-35)
+	if err == nil {
+		out = append(out, res...)
+	}
+
+	res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{From: robust}, tipset.Key(), tipset.Height()-35)
+	if err == nil {
+		out = append(out, res...)
+	}
+
+	res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{To: id}, tipset.Key(), tipset.Height()-35)
+	if err == nil {
+		out = append(out, res...)
+	}
+
+	res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{To: id}, tipset.Key(), tipset.Height()-35)
+	if err == nil {
+		out = append(out, res...)
+	}
+
+	var invoc []*lotusapi.InvocResult
+	for _, iter := range out {
+		replay, err := t.api.StateReplay(ctx, types.EmptyTSK, iter)
+		if err != nil {
+			return nil, err
+		}
+		invoc = append(invoc, replay)
+	}
+
+	// t.api.ChainGetMessage()
+	// t.api.StateSearchMsg()
+	// t.api.StateReplay(ctx, tipset.Key(), cid)
+	return invoc, err 
 }
 
 func (t *Node) ChainHead(ctx context.Context) (*types.TipSet, error) {
@@ -181,15 +240,55 @@ func (t *Node) AddressLookup(id string) (*model.Address, error){
 			//protocol = ID
 			result.ID = addr.String()
 			rs, err = t.api.StateAccountKey(context.Background(), addr, types.EmptyTSK)
-			if(err==nil){
-				result.Robust = rs.String()
+			if err != nil {
+				return nil, err
 			}
+			result.Robust = rs.String()
 		default:
 			result.Robust = addr.String()
 			rs, err = t.api.StateLookupID(context.Background(), addr, types.EmptyTSK)
-			if(err==nil){
-				result.ID = rs.String()
+			if err != nil {
+				return nil, err
 			}
+			result.ID = rs.String()
 	}
 	return result, nil
+}
+
+func (t *Node) AddressGetID(id string) (address.Address, error){
+	addr, err := address.NewFromString(id)
+	if err != nil {
+		return addr, err
+	}
+	var rs address.Address
+	switch(addr.Protocol()){
+		case address.ID:
+			//protocol = ID
+			return addr, nil
+		default:
+			rs, err = t.api.StateLookupID(context.Background(), addr, types.EmptyTSK)
+			if err != nil {
+				return rs, err
+			}
+			return rs, nil
+	}
+}
+
+func (t *Node) AddressGetRobust(id string) (address.Address, error){
+	addr, err := address.NewFromString(id)
+	if err != nil {
+		return addr, err
+	}
+	var rs address.Address
+	switch(addr.Protocol()){
+		case address.ID:
+			//protocol = ID
+			rs, err = t.api.StateAccountKey(context.Background(), addr, types.EmptyTSK)
+			if err != nil {
+				return rs, err
+			}
+			return rs, nil
+		default:
+			return addr, nil
+	}
 }

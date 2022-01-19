@@ -91,7 +91,7 @@ func (r *queryResolver) Messages(ctx context.Context, address *string, limit *in
 		item.Height = savedItem.Height
 		item.From = savedItem.From
 		item.To = savedItem.To
-		item.Value = strconv.FormatFloat(savedItem.Value,'f',-1,64)
+		item.Value = strconv.FormatFloat(savedItem.Value, 'f', -1, 64)
 		item.Method = savedItem.Method
 		item.Params = savedItem.Params
 		items = append(items, &item)
@@ -138,7 +138,13 @@ func (r *queryResolver) PendingMessages(ctx context.Context, address *string, li
 func (r *queryResolver) MessagesConfirmed(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessageConfirmed, error) {
 	var items []*model.MessageConfirmed
 	var rs []derived.GasOutputs
-	rs, err := r.MessageConfirmedService.List(address, limit, offset)
+
+	addr, err := r.NodeService.AddressLookup(*address)
+	if err != nil {
+		return nil, err
+	}
+
+	rs, err = r.MessageConfirmedService.Search(addr, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -223,6 +229,39 @@ func (r *queryResolver) MsigPending(ctx context.Context, address *string, limit 
 			item.Approved = append(item.Approved, appr.String())
 		}
 		//copier.Copy(&item, &r)
+		items = append(items, &item)
+	}
+	return items, nil
+}
+
+func (r *queryResolver) StateListMessages(ctx context.Context, address string) ([]*model.MessageConfirmed, error) {
+	var items []*model.MessageConfirmed
+
+	pending, err := r.NodeService.StateListMessages(ctx, address)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, iter := range pending {
+		var item model.MessageConfirmed
+		// res, _ := r.NodeService.GetMessage(iter.String())
+		// msg, _ := r.NodeService.StateSearchMsg(iter.String())		
+		item.Cid = iter.MsgCid.String()
+		item.Version = int(iter.Msg.Version)
+		item.From = iter.Msg.From.String()
+		item.To = iter.Msg.To.String()
+		item.Nonce = iter.Msg.Nonce
+		item.Value = iter.Msg.Value.String()
+		item.GasLimit = iter.Msg.GasLimit
+		gasfeecap := iter.Msg.GasFeeCap.String()
+		item.GasFeeCap = gasfeecap
+		gaspremium := iter.Msg.GasPremium.String()
+		item.GasPremium = gaspremium
+		item.Method = uint64(iter.Msg.Method)
+		item.MinerTip = iter.GasCost.MinerTip.String()
+		item.BaseFeeBurn = iter.GasCost.BaseFeeBurn.String()
+		item.OverEstimationBurn = iter.GasCost.OverEstimationBurn.String()
+
 		items = append(items, &item)
 	}
 	return items, nil
