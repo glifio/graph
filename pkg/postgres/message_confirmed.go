@@ -42,6 +42,7 @@ func (t *MessageConfirmed) List(address *string, limit *int, offset *int) ([]der
     var err = t.db.Db.Model(&msgs).
 		Where("gas_outputs.from = ?", *address).
 		WhereOr("gas_outputs.to = ?", *address).
+		Order("gas_outputs.height desc").
 		Limit(*limit).
 		Offset(*offset).
 		Select()
@@ -60,6 +61,7 @@ func (t *MessageConfirmed) Search(address *model.Address, limit *int, offset *in
 		WhereOr("gas_outputs.from = ?", address.Robust).
 		WhereOr("gas_outputs.to = ?", address.ID).
 		WhereOr("gas_outputs.to = ?", address.Robust).
+		Order("gas_outputs.height desc").
 		Limit(*limit).
 		Offset(*offset).
 		Select()
