@@ -2,15 +2,17 @@ package node
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-jsonrpc"
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/api"
 	lotusapi "github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/lotus/api/v1api"
+	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/glifio/graph/gql/model"
 	"github.com/ipfs/go-cid"
@@ -18,17 +20,13 @@ import (
 
 type NodeInterface interface {
 	GetActor(id string) (*types.Actor, error)
-	GetPendingMessages(id string) ([][]lotusapi.MessageCheckStatus, error)
 	GetPending() ([]*types.SignedMessage, error)
 	GetMessage(cidcc string) (*types.Message, error)
 	StateSearchMsg(id string) (*lotusapi.MsgLookup, error)
 	AddressLookup(id string) (*model.Address, error)
 	MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error)
-	//StateListMessages(ctx context.Context, fromto string)([]cid.Cid, error)
 	StateListMessages(ctx context.Context, addr string)([]*lotusapi.InvocResult, error)
-
-
-
+	StateDecodeParams(id address.Address, p2 abi.MethodNum, p3 []byte) (string, error)
 
 	ChainHeadSub(ctx context.Context) (<-chan []*lotusapi.HeadChange, error)
 	MpoolSub(ctx context.Context) (<-chan lotusapi.MpoolUpdate, error)
@@ -37,7 +35,7 @@ type NodeInterface interface {
 type Node struct {
 	//api1 lotusapi.FullNodeStruct
 	closer jsonrpc.ClientCloser
-	api v1api.FullNodeStruct
+	api v0api.FullNodeStruct
 }
 
 func (t *Node) Connect(address1 string, token string){
@@ -115,23 +113,27 @@ func (t *Node) StateSearchMsg(id string) (*lotusapi.MsgLookup, error){
 		log.Fatal(err)
 	}
 	
-	msg, err := t.api.StateSearchMsg(context.Background(), types.EmptyTSK, c, 0, true )
+	msg, err := t.api.StateSearchMsg(context.Background(), c)
 
 	return msg, err
 }
 
-func (t *Node) GetPendingMessages(id string) ([][]lotusapi.MessageCheckStatus, error) {
-	addr, err := address.NewFromString(id)
-	if err != nil {
-		log.Fatal(err)
+func (t *Node) StateDecodeParams(id address.Address, p2 abi.MethodNum, p3 []byte) (string, error){
+	var res string
+	if p3 == nil {
+		return res, nil
 	}
-	
-	status, err := t.api.MpoolCheckPendingMessages(context.Background(), addr)
-	//status, err := t.api.MpoolCheckMessages(context.Background())
+	obj, err := t.api.StateDecodeParams(context.Background(), id, p2, p3, types.EmptyTSK )
 	if err != nil {
-		log.Fatal(err)
+		return res, err
 	}
-	return status, nil
+	parambytes, err := json.Marshal(obj)
+	if err != nil {
+		return res, err
+	}
+	res = string(parambytes)
+
+	return res, err
 }
 
 func (t *Node) MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error) {
@@ -154,10 +156,12 @@ func (t *Node) StateListMessages(ctx context.Context, addr string)([]*lotusapi.I
 		return nil, err
 	}
 
+	lookback := 35 
+
 	robust, _ := t.AddressGetRobust(addr)	
 	id, _ := t.AddressGetID(addr)
 
-	res, err := t.api.StateListMessages(ctx, &lotusapi.MessageMatch{From: id}, tipset.Key(), tipset.Height()-35)
+	res, err := t.api.StateListMessages(ctx, &lotusapi.MessageMatch{From: id}, tipset.Key(), tipset.Height()-abi.ChainEpoch(lookback))
 	if err == nil {
 		out = append(out, res...)
 	}

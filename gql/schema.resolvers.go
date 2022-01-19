@@ -128,8 +128,20 @@ func (r *queryResolver) PendingMessages(ctx context.Context, address *string, li
 		msg.GasFeeCap = new(string)
 		var gasfeecap = item.Message.GasFeeCap.String()
 		msg.GasFeeCap = &gasfeecap
-		// var gaslimit = strconv.FormatInt(item.Message.GasLimit, 64)
-		// msg.GasLimit = &gaslimit
+
+		msg.GasPremium = new(string)
+		var gasPremium = item.Message.GasPremium.String()
+		msg.GasPremium = &gasPremium
+
+		var gaslimit = strconv.FormatInt(item.Message.GasLimit, 10)
+		msg.GasLimit = &gaslimit
+
+		obj, err := r.NodeService.StateDecodeParams(item.Message.To, item.Message.Method, item.Message.Params)
+
+		if err == nil && obj != "" {
+			msg.Params = &obj				
+		}
+
 		items = append(items, &msg)
 	}
 	return items, nil
@@ -219,8 +231,10 @@ func (r *queryResolver) MsigPending(ctx context.Context, address *string, limit 
 		var item model.MsigTransaction
 		item.ID = iter.ID
 		item.Method = uint64(iter.Method)
-		if iter.Params != nil {
-			*item.Params = string(iter.Params)
+		obj, err := r.NodeService.StateDecodeParams(iter.To, iter.Method, iter.Params)
+
+		if err == nil && obj != "" {
+			item.Params = &obj				
 		}
 		item.To = iter.To.String()
 		item.Value = iter.Value.String()
@@ -245,7 +259,12 @@ func (r *queryResolver) StateListMessages(ctx context.Context, address string) (
 	for _, iter := range pending {
 		var item model.MessageConfirmed
 		// res, _ := r.NodeService.GetMessage(iter.String())
-		// msg, _ := r.NodeService.StateSearchMsg(iter.String())		
+		statemsg, err2 := r.NodeService.StateSearchMsg(iter.MsgCid.String())		
+		if err2 != nil {
+			fmt.Println(err2)
+		} else {
+			item.Height = int64(statemsg.Height)
+		}
 		item.Cid = iter.MsgCid.String()
 		item.Version = int(iter.Msg.Version)
 		item.From = iter.Msg.From.String()
@@ -261,6 +280,12 @@ func (r *queryResolver) StateListMessages(ctx context.Context, address string) (
 		item.MinerTip = iter.GasCost.MinerTip.String()
 		item.BaseFeeBurn = iter.GasCost.BaseFeeBurn.String()
 		item.OverEstimationBurn = iter.GasCost.OverEstimationBurn.String()
+
+		obj, err := r.NodeService.StateDecodeParams(iter.Msg.To, iter.Msg.Method, iter.Msg.Params)
+
+		if err == nil && obj != "" {
+			item.Params = &obj				
+		}
 
 		items = append(items, &item)
 	}
