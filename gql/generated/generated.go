@@ -152,16 +152,17 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Actor             func(childComplexity int, address string) int
-		Actors            func(childComplexity int) int
-		Address           func(childComplexity int, str string) int
-		Block             func(childComplexity int, address string, height int64) int
-		Message           func(childComplexity int, cid *string) int
-		Messages          func(childComplexity int, address *string, limit *int, offset *int) int
-		MessagesConfirmed func(childComplexity int, address *string, limit *int, offset *int) int
-		MsigPending       func(childComplexity int, address *string, limit *int, offset *int) int
-		PendingMessages   func(childComplexity int, address *string, limit *int, offset *int) int
-		StateListMessages func(childComplexity int, address string) int
+		Actor                func(childComplexity int, address string) int
+		Actors               func(childComplexity int) int
+		Address              func(childComplexity int, str string) int
+		Block                func(childComplexity int, address string, height int64) int
+		Message              func(childComplexity int, cid *string) int
+		MessageLowConfidence func(childComplexity int, cid string) int
+		Messages             func(childComplexity int, address *string, limit *int, offset *int) int
+		MessagesConfirmed    func(childComplexity int, address *string, limit *int, offset *int) int
+		MsigPending          func(childComplexity int, address *string, limit *int, offset *int) int
+		PendingMessages      func(childComplexity int, address *string, limit *int, offset *int) int
+		StateListMessages    func(childComplexity int, address string) int
 	}
 
 	QueryMessage struct {
@@ -200,6 +201,7 @@ type QueryResolver interface {
 	Actors(ctx context.Context) ([]*model.Actor, error)
 	MsigPending(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MsigTransaction, error)
 	StateListMessages(ctx context.Context, address string) ([]*model.MessageConfirmed, error)
+	MessageLowConfidence(ctx context.Context, cid string) (*model.MessageConfirmed, error)
 }
 type SubscriptionResolver interface {
 	Messages(ctx context.Context) (<-chan []*model.Message, error)
@@ -835,6 +837,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.Message(childComplexity, args["cid"].(*string)), true
 
+	case "Query.messageLowConfidence":
+		if e.complexity.Query.MessageLowConfidence == nil {
+			break
+		}
+
+		args, err := ec.field_Query_messageLowConfidence_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.MessageLowConfidence(childComplexity, args["cid"].(string)), true
+
 	case "Query.messages":
 		if e.complexity.Query.Messages == nil {
 			break
@@ -1046,6 +1060,7 @@ type Query {
     offset: Int = 0
   ): [MsigTransaction!]!
   stateListMessages(address: String!): [MessageConfirmed]
+  messageLowConfidence(cid: String!): MessageConfirmed!
 }
 
 type Subscription {
@@ -1271,6 +1286,21 @@ func (ec *executionContext) field_Query_block_args(ctx context.Context, rawArgs 
 		}
 	}
 	args["height"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_messageLowConfidence_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["cid"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("cid"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["cid"] = arg0
 	return args, nil
 }
 
@@ -4608,6 +4638,48 @@ func (ec *executionContext) _Query_stateListMessages(ctx context.Context, field 
 	return ec.marshalOMessageConfirmed2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageConfirmed(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Query_messageLowConfidence(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_messageLowConfidence_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().MessageLowConfidence(rctx, args["cid"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.MessageConfirmed)
+	fc.Result = res
+	return ec.marshalNMessageConfirmed2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageConfirmed(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -6795,6 +6867,20 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_stateListMessages(ctx, field)
+				return res
+			})
+		case "messageLowConfidence":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_messageLowConfidence(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
 				return res
 			})
 		case "__type":

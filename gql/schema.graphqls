@@ -28,6 +28,7 @@ type Query {
     offset: Int = 0
   ): [MsigTransaction!]!
   stateListMessages(address: String!): [MessageConfirmed]
+  messageLowConfidence(cid: String!): MessageConfirmed!
 }
 
 type Subscription {

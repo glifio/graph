@@ -139,7 +139,7 @@ func (r *queryResolver) PendingMessages(ctx context.Context, address *string, li
 		obj, err := r.NodeService.StateDecodeParams(item.Message.To, item.Message.Method, item.Message.Params)
 
 		if err == nil && obj != "" {
-			msg.Params = &obj				
+			msg.Params = &obj
 		}
 
 		items = append(items, &msg)
@@ -234,7 +234,7 @@ func (r *queryResolver) MsigPending(ctx context.Context, address *string, limit 
 		obj, err := r.NodeService.StateDecodeParams(iter.To, iter.Method, iter.Params)
 
 		if err == nil && obj != "" {
-			item.Params = &obj				
+			item.Params = &obj
 		}
 		item.To = iter.To.String()
 		item.Value = iter.Value.String()
@@ -259,7 +259,7 @@ func (r *queryResolver) StateListMessages(ctx context.Context, address string) (
 	for _, iter := range pending {
 		var item model.MessageConfirmed
 		// res, _ := r.NodeService.GetMessage(iter.String())
-		statemsg, err2 := r.NodeService.StateSearchMsg(iter.MsgCid.String())		
+		statemsg, err2 := r.NodeService.StateSearchMsg(iter.MsgCid.String())
 		if err2 != nil {
 			fmt.Println(err2)
 		} else {
@@ -284,12 +284,52 @@ func (r *queryResolver) StateListMessages(ctx context.Context, address string) (
 		obj, err := r.NodeService.StateDecodeParams(iter.Msg.To, iter.Msg.Method, iter.Msg.Params)
 
 		if err == nil && obj != "" {
-			item.Params = &obj				
+			item.Params = &obj
 		}
 
 		items = append(items, &item)
 	}
 	return items, nil
+}
+
+func (r *queryResolver) MessageLowConfidence(ctx context.Context, cid string) (*model.MessageConfirmed, error) {
+	var item model.MessageConfirmed
+
+	iter, err := r.NodeService.StateReplay(ctx, cid)
+	if err != nil {
+		return nil, err
+	}
+
+	statemsg, err := r.NodeService.StateSearchMsg(cid)
+	if err != nil {
+		return nil, err
+	} else {
+		item.Height = int64(statemsg.Height)
+	}
+
+	item.Cid = iter.MsgCid.String()
+	item.Version = int(iter.Msg.Version)
+	item.From = iter.Msg.From.String()
+	item.To = iter.Msg.To.String()
+	item.Nonce = iter.Msg.Nonce
+	item.Value = iter.Msg.Value.String()
+	item.GasLimit = iter.Msg.GasLimit
+	gasfeecap := iter.Msg.GasFeeCap.String()
+	item.GasFeeCap = gasfeecap
+	gaspremium := iter.Msg.GasPremium.String()
+	item.GasPremium = gaspremium
+	item.Method = uint64(iter.Msg.Method)
+	item.MinerTip = iter.GasCost.MinerTip.String()
+	item.BaseFeeBurn = iter.GasCost.BaseFeeBurn.String()
+	item.OverEstimationBurn = iter.GasCost.OverEstimationBurn.String()
+
+	obj, err := r.NodeService.StateDecodeParams(iter.Msg.To, iter.Msg.Method, iter.Msg.Params)
+
+	if err == nil && obj != "" {
+		item.Params = &obj
+	}
+
+	return &item, nil
 }
 
 func (r *subscriptionResolver) Messages(ctx context.Context) (<-chan []*model.Message, error) {

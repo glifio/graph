@@ -27,6 +27,7 @@ type NodeInterface interface {
 	MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error)
 	StateListMessages(ctx context.Context, addr string)([]*lotusapi.InvocResult, error)
 	StateDecodeParams(id address.Address, p2 abi.MethodNum, p3 []byte) (string, error)
+	StateReplay(ctx context.Context, id string) (*lotusapi.InvocResult, error)
 
 	ChainHeadSub(ctx context.Context) (<-chan []*lotusapi.HeadChange, error)
 	MpoolSub(ctx context.Context) (<-chan lotusapi.MpoolUpdate, error)
@@ -194,6 +195,15 @@ func (t *Node) StateListMessages(ctx context.Context, addr string)([]*lotusapi.I
 	// t.api.StateSearchMsg()
 	// t.api.StateReplay(ctx, tipset.Key(), cid)
 	return invoc, err 
+}
+
+func (t *Node) StateReplay(ctx context.Context, id string) (*lotusapi.InvocResult, error) {
+	c, err := cid.Decode(id)
+	if err != nil {
+		return nil, err
+	}
+	res, err := t.api.StateReplay(ctx, types.EmptyTSK, c)
+	return res, err
 }
 
 func (t *Node) ChainHead(ctx context.Context) (*types.TipSet, error) {
