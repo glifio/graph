@@ -144,9 +144,7 @@ func (t *Node) MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error) 
 	}
 	
 	pending, err := t.api.MsigGetPending(context.Background(), res, types.EmptyTSK)
-	if err != nil {
-		fmt.Println("get")
-	}
+
 	return pending, err
 }
 

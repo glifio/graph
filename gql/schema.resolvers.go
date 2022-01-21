@@ -5,6 +5,7 @@ package graph
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/filecoin-project/lily/model/derived"
 	"github.com/filecoin-project/specs-actors/actors/builtin"
+	"github.com/filecoin-project/specs-actors/actors/builtin/multisig"
+	"github.com/filecoin-project/specs-actors/actors/runtime"
 	"github.com/glifio/graph/gql/generated"
 	"github.com/glifio/graph/gql/model"
 	util "github.com/glifio/graph/internal/utils"
@@ -236,6 +239,17 @@ func (r *queryResolver) MsigPending(ctx context.Context, address *string, limit 
 		if err == nil && obj != "" {
 			item.Params = &obj
 		}
+
+		if iter.Params != nil {
+			// confirm the hashes match
+			var rt runtime.Runtime
+			rt.ValidateImmediateCallerType(builtin.CallerTypesSignable...)
+			txn := &multisig.Transaction{To: iter.To, Value: iter.Value, Method: iter.Method, Params: iter.Params, Approved: iter.Approved}
+
+			calculatedHash, _ := multisig.ComputeProposalHash(txn, rt.HashBlake2b)
+			item.ProposalHash = base64.URLEncoding.EncodeToString(calculatedHash)
+		}
+
 		item.To = iter.To.String()
 		item.Value = iter.Value.String()
 		for _, appr := range iter.Approved {

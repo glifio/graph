@@ -60,12 +60,13 @@ type MpoolUpdate struct {
 }
 
 type MsigTransaction struct {
-	ID       int64    `json:"id"`
-	To       string   `json:"to"`
-	Value    string   `json:"value"`
-	Method   uint64   `json:"method"`
-	Params   *string  `json:"params"`
-	Approved []string `json:"approved"`
+	ID           int64    `json:"id"`
+	To           string   `json:"to"`
+	Value        string   `json:"value"`
+	Method       uint64   `json:"method"`
+	Params       *string  `json:"params"`
+	Approved     []string `json:"approved"`
+	ProposalHash string   `json:"proposalHash"`
 }
 
 type QueryMessage struct {
