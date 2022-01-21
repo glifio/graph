@@ -241,7 +241,7 @@ func (t *Node) GetPending() ([]*types.SignedMessage, error) {
 }
 
 func (t *Node) AddressLookup(id string) (*model.Address, error){
-	result := &model.Address{}
+	result := &model.Address{ID: "", Robust: ""}
 	addr, err := address.NewFromString(id)
 	if err != nil {
 		log.Fatal(err)
@@ -252,17 +252,15 @@ func (t *Node) AddressLookup(id string) (*model.Address, error){
 			//protocol = ID
 			result.ID = addr.String()
 			rs, err = t.api.StateAccountKey(context.Background(), addr, types.EmptyTSK)
-			if err != nil {
-				return nil, err
+			if err == nil {
+				result.Robust = rs.String()
 			}
-			result.Robust = rs.String()
 		default:
 			result.Robust = addr.String()
 			rs, err = t.api.StateLookupID(context.Background(), addr, types.EmptyTSK)
-			if err != nil {
-				return nil, err
+			if err == nil {
+				result.ID = rs.String()
 			}
-			result.ID = rs.String()
 	}
 	return result, nil
 }
