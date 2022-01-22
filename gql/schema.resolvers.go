@@ -34,6 +34,9 @@ func (r *messageConfirmedResolver) To(ctx context.Context, obj *model.MessageCon
 }
 
 func (r *messageConfirmedResolver) MethodName(ctx context.Context, obj *model.MessageConfirmed) (string, error) {
+	if obj.ActorName == "" {
+		return "", nil
+	}
 	switch strings.Split(obj.ActorName, "/")[2] {
 	case "account":
 		return reflect.ValueOf(&builtin.MethodsAccount).Elem().Type().Field(int(obj.Method)).Name, nil
@@ -104,24 +107,13 @@ func (r *queryResolver) Messages(ctx context.Context, address *string, limit *in
 
 func (r *queryResolver) PendingMessages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessagePending, error) {
 	var items []*model.MessagePending
-	//pending, err := r.NodeService.GetPendingMessages(*address)
+
 	pending, err := r.NodeService.GetPending()
+
 	if err != nil {
 		return nil, err
 	}
-	// for i, item := range pending {
-	// 	var msg model.Message
-	// 	msg.Cid = item[i].Cid.String()
-	// 	m, err := r.NodeService.GetMessage(msg.Cid)
-	// 	if err != nil {
-	// 		msg.To = m.To.String()
-	// 		msg.Method = m.Method.String()
-	// 		*msg.GasFeeCap = m.GasFeeCap.String()
-	// 		*msg.GasLimit = strconv.FormatInt(m.GasLimit, 64)
-	// 	}
-	// 	fmt.Println(item[i].Cid)
-	// 	items = append(items, &msg)
-	// }
+
 	for _, item := range pending {
 		var msg model.MessagePending
 		msg.Cid = item.Cid().String()
@@ -447,10 +439,12 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 				gaspremium := msg.Message.Message.GasPremium.String()
 				res.Message.GasPremium = &gaspremium
 				res.Message.Method = msg.Message.Message.Method.String()
-				// if msg.Message.Message.Params != nil {
-				// 	params := string(msg.Message.Message.Params)
-				// 	res.Message.Params = &params
-				// }
+				
+				obj, err := r.NodeService.StateDecodeParams(msg.Message.Message.To, msg.Message.Message.Method, msg.Message.Message.Params)
+
+				if err == nil && obj != "" {
+					res.Message.Params = &obj
+				}
 
 				r.mu.Lock()
 				for _, observer := range r.MpoolObserver.Observers {
