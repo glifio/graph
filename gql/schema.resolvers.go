@@ -454,8 +454,8 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 
 				r.mu.Lock()
 				for _, observer := range r.MpoolObserver.Observers {
-					fmt.Printf("address: %s\n", *address)
 					if res.Message.From == observer.address || res.Message.To == observer.address {
+						fmt.Printf("update: %s cid: %s\n", observer.address, res.Message.Cid)
 						observer.update <- &res
 					}
 				}

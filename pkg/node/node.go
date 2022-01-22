@@ -160,22 +160,22 @@ func (t *Node) StateListMessages(ctx context.Context, addr string)([]*lotusapi.I
 	robust, _ := t.AddressGetRobust(addr)	
 	id, _ := t.AddressGetID(addr)
 
-	res, err := t.api.StateListMessages(ctx, &lotusapi.MessageMatch{From: id}, tipset.Key(), tipset.Height()-abi.ChainEpoch(lookback))
+	res, err := t.api.StateListMessages(ctx, &lotusapi.MessageMatch{From: id}, types.EmptyTSK, tipset.Height()-abi.ChainEpoch(lookback))
 	if err == nil {
 		out = append(out, res...)
 	}
 
-	res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{From: robust}, tipset.Key(), tipset.Height()-35)
+	res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{From: robust}, types.EmptyTSK, tipset.Height()-35)
 	if err == nil {
 		out = append(out, res...)
 	}
 
-	res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{To: id}, tipset.Key(), tipset.Height()-35)
+	res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{To: id}, types.EmptyTSK, tipset.Height()-35)
 	if err == nil {
 		out = append(out, res...)
 	}
 
-	res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{To: id}, tipset.Key(), tipset.Height()-35)
+	res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{To: robust}, types.EmptyTSK, tipset.Height()-35)
 	if err == nil {
 		out = append(out, res...)
 	}
@@ -184,14 +184,13 @@ func (t *Node) StateListMessages(ctx context.Context, addr string)([]*lotusapi.I
 	for _, iter := range out {
 		replay, err := t.api.StateReplay(ctx, types.EmptyTSK, iter)
 		if err != nil {
-			return nil, err
+			//return nil, err
+			fmt.Printf("error: %s\n", err)
+		} else {
+			invoc = append(invoc, replay)
 		}
-		invoc = append(invoc, replay)
 	}
 
-	// t.api.ChainGetMessage()
-	// t.api.StateSearchMsg()
-	// t.api.StateReplay(ctx, tipset.Key(), cid)
 	return invoc, err 
 }
 
