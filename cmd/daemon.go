@@ -5,8 +5,10 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
 	graph "github.com/glifio/graph/gql"
@@ -64,7 +66,7 @@ var daemonCmd = &cobra.Command{
 		Debug:            false,
 	}).Handler)
 
-	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{
+	srv := handler.New(generated.NewExecutableSchema(generated.Config{
 		Resolvers: &graph.Resolver{
 			NodeService: nodeService, 
 			MessageService: messageService, 
@@ -72,18 +74,17 @@ var daemonCmd = &cobra.Command{
 			BlockService: blockService, 
 		},
 	}))
-	srv.AddTransport(&transport.Websocket{
-        Upgrader: websocket.Upgrader{
-            CheckOrigin: func(r *http.Request) bool {
-                // Check against your desired domains here
-                // return r.Host == "example.org"
+	srv.AddTransport(transport.POST{})
+	srv.AddTransport(transport.Websocket{
+		KeepAlivePingInterval: 10 * time.Second,
+		Upgrader: websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool {
 				fmt.Printf("wss origin: %s\n", r.Host)
 				return true
-            },
-            ReadBufferSize:  1024,
-            WriteBufferSize: 1024,
-        },
-    })
+			},
+		},
+	})
+	srv.Use(extension.Introspection{})
 
 	router.Handle("/", playground.Handler("GraphQL playground", "/query"))
 	router.Handle("/query", srv)
