@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -307,6 +308,11 @@ func (r *queryResolver) StateListMessages(ctx context.Context, address string) (
 
 		items = append(items, &item)
 	}
+
+	// sort the result by height
+	sort.Slice(items, func(i, j int) bool { 
+		return items[i].Height < items[j].Height })
+
 	return items, nil
 }
 
