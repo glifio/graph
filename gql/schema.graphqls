@@ -52,7 +52,7 @@ type ChainHead {
 
 type MpoolUpdate {
   type: Int
-  message: Message!
+  message: MessagePending!
 }
 
 type TipSet {
@@ -79,17 +79,17 @@ type Message {
 
 type MessagePending {
   cid: String!
-  version: Int
+  version: String!
   to: Address!
   from: Address!
   nonce: String
   #value(unit: FilUnit = AttoFil): Float!
-  value: Float!
+  value: String!
   gasLimit: String
   gasFeeCap: String
   gasPremium: String
   method: String!
-  height: Float!
+  height: String!
   params: String
 }
 

@@ -1092,7 +1092,7 @@ type ChainHead {
 
 type MpoolUpdate {
   type: Int
-  message: Message!
+  message: MessagePending!
 }
 
 type TipSet {
@@ -1119,17 +1119,17 @@ type Message {
 
 type MessagePending {
   cid: String!
-  version: Int
+  version: String!
   to: Address!
   from: Address!
   nonce: String
   #value(unit: FilUnit = AttoFil): Float!
-  value: Float!
+  value: String!
   gasLimit: String
   gasFeeCap: String
   gasPremium: String
   method: String!
-  height: Float!
+  height: String!
   params: String
 }
 
@@ -3630,11 +3630,14 @@ func (ec *executionContext) _MessagePending_version(ctx context.Context, field g
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*int)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MessagePending_to(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
@@ -3769,9 +3772,9 @@ func (ec *executionContext) _MessagePending_value(ctx context.Context, field gra
 		}
 		return graphql.Null
 	}
-	res := resTmp.(float64)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalNFloat2float64(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MessagePending_gasLimit(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
@@ -3935,9 +3938,9 @@ func (ec *executionContext) _MessagePending_height(ctx context.Context, field gr
 		}
 		return graphql.Null
 	}
-	res := resTmp.(float64)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalNFloat2float64(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MessagePending_params(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
@@ -4034,9 +4037,9 @@ func (ec *executionContext) _MpoolUpdate_message(ctx context.Context, field grap
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*model.Message)
+	res := resTmp.(*model.MessagePending)
 	fc.Result = res
-	return ec.marshalNMessage2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessage(ctx, field.Selections, res)
+	return ec.marshalNMessagePending2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessagePending(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MsigTransaction_id(ctx context.Context, field graphql.CollectedField, obj *model.MsigTransaction) (ret graphql.Marshaler) {
@@ -6646,6 +6649,9 @@ func (ec *executionContext) _MessagePending(ctx context.Context, sel ast.Selecti
 			}
 		case "version":
 			out.Values[i] = ec._MessagePending_version(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		case "to":
 			out.Values[i] = ec._MessagePending_to(ctx, field, obj)
 			if out.Values[i] == graphql.Null {

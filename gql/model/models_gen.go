@@ -41,22 +41,22 @@ type ChainHead struct {
 
 type MessagePending struct {
 	Cid        string   `json:"cid"`
-	Version    *int     `json:"version"`
+	Version    string   `json:"version"`
 	To         *Address `json:"to"`
 	From       *Address `json:"from"`
 	Nonce      *string  `json:"nonce"`
-	Value      float64  `json:"value"`
+	Value      string   `json:"value"`
 	GasLimit   *string  `json:"gasLimit"`
 	GasFeeCap  *string  `json:"gasFeeCap"`
 	GasPremium *string  `json:"gasPremium"`
 	Method     string   `json:"method"`
-	Height     float64  `json:"height"`
+	Height     string   `json:"height"`
 	Params     *string  `json:"params"`
 }
 
 type MpoolUpdate struct {
-	Type    *int     `json:"type"`
-	Message *Message `json:"message"`
+	Type    *int            `json:"type"`
+	Message *MessagePending `json:"message"`
 }
 
 type MsigTransaction struct {

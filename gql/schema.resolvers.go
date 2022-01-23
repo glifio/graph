@@ -117,8 +117,7 @@ func (r *queryResolver) PendingMessages(ctx context.Context, address *string, li
 	for _, item := range pending {
 		var msg model.MessagePending
 		msg.Cid = item.Cid().String()
-		msg.Version = new(int)
-		*msg.Version = int(item.Message.Version)
+		msg.Version = strconv.FormatUint(item.Message.Version, 10)
 		msg.Method = item.Message.Method.String()
 		msg.GasFeeCap = new(string)
 		var gasfeecap = item.Message.GasFeeCap.String()
@@ -426,20 +425,25 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 				var res model.MpoolUpdate
 
 				res.Type = (*int)(&msg.Type)
-				res.Message = &model.Message{}
+				res.Message = &model.MessagePending{}
 				res.Message.Cid = msg.Message.Cid().String()
-				res.Message.Version = &msg.Message.Message.Version
-				res.Message.From = msg.Message.Message.From.String()
-				res.Message.To = msg.Message.Message.To.String()
-				res.Message.Nonce = &msg.Message.Message.Nonce
+				res.Message.Version = strconv.FormatUint(msg.Message.Message.Version, 10)
+				fromaddr, _ := r.NodeService.AddressLookup(msg.Message.Message.From.String())
+				res.Message.From = fromaddr
+				toaddr, _ := r.NodeService.AddressLookup(msg.Message.Message.To.String())
+				res.Message.To = toaddr
+				nonce := strconv.FormatUint(msg.Message.Message.Nonce, 10)
+				res.Message.Nonce = &nonce
 				res.Message.Value = msg.Message.Message.Value.String()
-				res.Message.GasLimit = &msg.Message.Message.GasLimit
+				gaslimit := strconv.FormatInt(msg.Message.Message.GasLimit, 10)
+				res.Message.GasLimit = &gaslimit
 				gasfeecap := msg.Message.Message.GasFeeCap.String()
 				res.Message.GasFeeCap = &gasfeecap
 				gaspremium := msg.Message.Message.GasPremium.String()
 				res.Message.GasPremium = &gaspremium
 				res.Message.Method = msg.Message.Message.Method.String()
 				
+
 				obj, err := r.NodeService.StateDecodeParams(msg.Message.Message.To, msg.Message.Message.Method, msg.Message.Message.Params)
 
 				if err == nil && obj != "" {
@@ -448,7 +452,8 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 
 				r.mu.Lock()
 				for _, observer := range r.MpoolObserver.Observers {
-					if res.Message.From == observer.address || res.Message.To == observer.address {
+					if res.Message.From.Robust == observer.address || res.Message.To.Robust == observer.address ||
+					   res.Message.From.ID == observer.address || res.Message.To.ID == observer.address {
 						fmt.Printf("update: %s cid: %s\n", observer.address, res.Message.Cid)
 						observer.update <- &res
 					}
