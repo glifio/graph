@@ -123,6 +123,11 @@ func (r *queryResolver) PendingMessages(ctx context.Context, address *string, li
 		var gasfeecap = item.Message.GasFeeCap.String()
 		msg.GasFeeCap = &gasfeecap
 
+		fromaddr, _ := r.NodeService.AddressLookup(item.Message.From.String())
+		msg.From = fromaddr
+		toaddr, _ := r.NodeService.AddressLookup(item.Message.To.String())
+		msg.To = toaddr
+
 		msg.GasPremium = new(string)
 		var gasPremium = item.Message.GasPremium.String()
 		msg.GasPremium = &gasPremium
@@ -136,7 +141,11 @@ func (r *queryResolver) PendingMessages(ctx context.Context, address *string, li
 			msg.Params = &obj
 		}
 
-		items = append(items, &msg)
+		// todo optimize 
+		if msg.From.Robust == *address || msg.To.Robust == *address ||
+		msg.From.ID == *address || msg.To.ID == *address {
+			items = append(items, &msg)
+	 	}
 	}
 	return items, nil
 }
