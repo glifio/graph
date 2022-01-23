@@ -295,6 +295,9 @@ func (r *queryResolver) StateListMessages(ctx context.Context, address string) (
 		item.MinerTip = iter.GasCost.MinerTip.String()
 		item.BaseFeeBurn = iter.GasCost.BaseFeeBurn.String()
 		item.OverEstimationBurn = iter.GasCost.OverEstimationBurn.String()
+		item.Refund = iter.GasCost.Refund.String()
+		item.MinerPenalty = iter.GasCost.MinerPenalty.String()
+		item.MinerTip = iter.GasCost.MinerTip.String()
 
 		obj, err := r.NodeService.StateDecodeParams(iter.Msg.To, iter.Msg.Method, iter.Msg.Params)
 
@@ -337,6 +340,9 @@ func (r *queryResolver) MessageLowConfidence(ctx context.Context, cid string) (*
 	item.MinerTip = iter.GasCost.MinerTip.String()
 	item.BaseFeeBurn = iter.GasCost.BaseFeeBurn.String()
 	item.OverEstimationBurn = iter.GasCost.OverEstimationBurn.String()
+	item.Refund = iter.GasCost.Refund.String()
+	item.MinerPenalty = iter.GasCost.MinerPenalty.String()
+	item.MinerTip = iter.GasCost.MinerTip.String()
 
 	obj, err := r.NodeService.StateDecodeParams(iter.Msg.To, iter.Msg.Method, iter.Msg.Params)
 
