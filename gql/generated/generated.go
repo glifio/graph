@@ -1167,7 +1167,7 @@ type MessageConfirmed {
 
 type MsigTransaction {
   id: Int64!
-  to: String!
+  to: Address!
   value: String!
   method: Uint64!
   params: String
@@ -4107,9 +4107,9 @@ func (ec *executionContext) _MsigTransaction_to(ctx context.Context, field graph
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(*model.Address)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNAddress2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐAddress(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MsigTransaction_value(ctx context.Context, field graphql.CollectedField, obj *model.MsigTransaction) (ret graphql.Marshaler) {

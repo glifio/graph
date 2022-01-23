@@ -141,11 +141,11 @@ func (r *queryResolver) PendingMessages(ctx context.Context, address *string, li
 			msg.Params = &obj
 		}
 
-		// todo optimize 
+		// todo optimize
 		if msg.From.Robust == *address || msg.To.Robust == *address ||
-		msg.From.ID == *address || msg.To.ID == *address {
+			msg.From.ID == *address || msg.To.ID == *address {
 			items = append(items, &msg)
-	 	}
+		}
 	}
 	return items, nil
 }
@@ -250,7 +250,8 @@ func (r *queryResolver) MsigPending(ctx context.Context, address *string, limit 
 			item.ProposalHash = base64.URLEncoding.EncodeToString(calculatedHash)
 		}
 
-		item.To = iter.To.String()
+		toaddr, _ := r.NodeService.AddressLookup(iter.To.String())
+		item.To = toaddr
 		item.Value = iter.Value.String()
 		for _, appr := range iter.Approved {
 			//a, _ := r.NodeService.AddressLookup(appr.String())
@@ -451,7 +452,6 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 				gaspremium := msg.Message.Message.GasPremium.String()
 				res.Message.GasPremium = &gaspremium
 				res.Message.Method = msg.Message.Message.Method.String()
-				
 
 				obj, err := r.NodeService.StateDecodeParams(msg.Message.Message.To, msg.Message.Message.Method, msg.Message.Message.Params)
 
@@ -462,8 +462,8 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 				r.mu.Lock()
 				for _, observer := range r.MpoolObserver.Observers {
 					if res.Message.From.Robust == observer.address || res.Message.To.Robust == observer.address ||
-					   res.Message.From.ID == observer.address || res.Message.To.ID == observer.address {
-						fmt.Printf("update: %s cid: %s\n", observer.address, res.Message.Cid)
+						res.Message.From.ID == observer.address || res.Message.To.ID == observer.address {
+						//fmt.Printf("update: %s cid: %s\n", observer.address, res.Message.Cid)
 						observer.update <- &res
 					}
 				}

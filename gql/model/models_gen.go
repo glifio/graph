@@ -61,7 +61,7 @@ type MpoolUpdate struct {
 
 type MsigTransaction struct {
 	ID           int64    `json:"id"`
-	To           string   `json:"to"`
+	To           *Address `json:"to"`
 	Value        string   `json:"value"`
 	Method       uint64   `json:"method"`
 	Params       *string  `json:"params"`
