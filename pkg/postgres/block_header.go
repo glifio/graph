@@ -27,6 +27,10 @@ func (t *BlockHeader) GetByMessage(height int64, id string) (*blocks.BlockHeader
 		return nil, err
 	}
 
+	if len(block) == 0 {
+		return nil, nil
+	}
+
 	return &block[0], nil
 }
 
