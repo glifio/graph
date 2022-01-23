@@ -77,7 +77,8 @@ var daemonCmd = &cobra.Command{
             CheckOrigin: func(r *http.Request) bool {
                 // Check against your desired domains here
                 // return r.Host == "example.org"
-				 return r.Host == "*"
+				fmt.Printf("wss origin: %s\n", r.Host)
+				return true
             },
             ReadBufferSize:  1024,
             WriteBufferSize: 1024,
