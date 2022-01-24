@@ -124,6 +124,8 @@ func (r *queryResolver) PendingMessages(ctx context.Context, address *string, li
 		var gasfeecap = item.Message.GasFeeCap.String()
 		msg.GasFeeCap = &gasfeecap
 
+		msg.Value = item.Message.Value.String()
+
 		fromaddr, _ := r.NodeService.AddressLookup(item.Message.From.String())
 		msg.From = fromaddr
 		toaddr, _ := r.NodeService.AddressLookup(item.Message.To.String())
@@ -310,8 +312,9 @@ func (r *queryResolver) StateListMessages(ctx context.Context, address string) (
 	}
 
 	// sort the result by height
-	sort.Slice(items, func(i, j int) bool { 
-		return items[i].Height < items[j].Height })
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].Height < items[j].Height
+	})
 
 	return items, nil
 }
