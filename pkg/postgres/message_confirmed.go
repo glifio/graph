@@ -32,6 +32,10 @@ func (t *MessageConfirmed) Get(id string) (*lily.GasOutputs, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if len(msgs) == 0 {
+		return nil, nil 
+	}
 	
 	return &msgs[0], nil
 }
