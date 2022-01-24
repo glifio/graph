@@ -106,6 +106,49 @@ func (r *queryResolver) Messages(ctx context.Context, address *string, limit *in
 	return items, nil
 }
 
+func (r *queryResolver) PendingMessage(ctx context.Context, cid string) (*model.MessagePending, error) {
+	pending, err := r.NodeService.GetPending()
+
+	if err != nil {
+		return nil, err
+	}
+
+	for _, item := range pending {
+		if item.Cid().String() == cid {
+			var msg model.MessagePending
+			msg.Cid = item.Cid().String()
+			msg.Version = strconv.FormatUint(item.Message.Version, 10)
+			msg.Method = item.Message.Method.String()
+			msg.GasFeeCap = new(string)
+			var gasfeecap = item.Message.GasFeeCap.String()
+			msg.GasFeeCap = &gasfeecap
+
+			msg.Value = item.Message.Value.String()
+
+			fromaddr, _ := r.NodeService.AddressLookup(item.Message.From.String())
+			msg.From = fromaddr
+			toaddr, _ := r.NodeService.AddressLookup(item.Message.To.String())
+			msg.To = toaddr
+
+			msg.GasPremium = new(string)
+			var gasPremium = item.Message.GasPremium.String()
+			msg.GasPremium = &gasPremium
+
+			var gaslimit = strconv.FormatInt(item.Message.GasLimit, 10)
+			msg.GasLimit = &gaslimit
+
+			obj, err := r.NodeService.StateDecodeParams(item.Message.To, item.Message.Method, item.Message.Params)
+
+			if err == nil && obj != "" {
+				msg.Params = &obj
+			}
+
+			return &msg, nil
+		}
+	}
+	return nil, nil
+}
+
 func (r *queryResolver) PendingMessages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessagePending, error) {
 	var items []*model.MessagePending
 
