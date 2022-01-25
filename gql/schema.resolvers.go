@@ -307,10 +307,11 @@ func (r *queryResolver) MsigPending(ctx context.Context, address *string, limit 
 		item.To = toaddr
 		item.Value = iter.Value.String()
 		for _, appr := range iter.Approved {
-			//a, _ := r.NodeService.AddressLookup(appr.String())
-			item.Approved = append(item.Approved, appr.String())
+			approvedaddr, err := r.NodeService.AddressLookup(appr.String())
+			if err == nil {
+				item.Approved = append(item.Approved, approvedaddr)
+			}
 		}
-		//copier.Copy(&item, &r)
 		items = append(items, &item)
 	}
 	return items, nil

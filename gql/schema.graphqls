@@ -132,7 +132,7 @@ type MsigTransaction {
   value: String!
   method: Uint64!
   params: String
-  approved: [String!]
+  approved: [Address!]
   proposalHash: String!
 }
 
