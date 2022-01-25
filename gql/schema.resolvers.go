@@ -69,17 +69,24 @@ func (r *messageConfirmedResolver) Block(ctx context.Context, obj *model.Message
 
 func (r *queryResolver) Block(ctx context.Context, address string, height int64) (*model.Block, error) {
 	block, err := r.BlockService.GetByMessage(height, address)
+	if err != nil {
+		return nil, err
+	}
 	var item model.Block
 	copier.Copy(&item, &block)
 	return &item, err
 }
 
 func (r *queryResolver) Message(ctx context.Context, cid *string) (*model.MessageConfirmed, error) {
-	//msg, err := r.NodeService.GetMessage(*cid)
 	msg, err := r.MessageConfirmedService.Get(*cid)
+	if err != nil {
+		return nil, err
+	}
 	var item model.MessageConfirmed
 	copier.Copy(&item, &msg)
-	item.Params = &msg.ParsedMessage.Params
+	if msg.ParsedMessage != nil {
+		item.Params = &msg.ParsedMessage.Params
+	}
 	return &item, err
 }
 
