@@ -15,13 +15,13 @@ import (
 	"github.com/filecoin-project/lily/model/derived"
 	"github.com/filecoin-project/specs-actors/actors/builtin"
 	"github.com/filecoin-project/specs-actors/actors/builtin/multisig"
-	"github.com/filecoin-project/specs-actors/actors/runtime"
 	"github.com/glifio/graph/gql/generated"
 	"github.com/glifio/graph/gql/model"
 	util "github.com/glifio/graph/internal/utils"
 	"github.com/glifio/graph/pkg/lily"
 	"github.com/google/uuid"
 	"github.com/jinzhu/copier"
+	"golang.org/x/crypto/blake2b"
 )
 
 func (r *messageConfirmedResolver) From(ctx context.Context, obj *model.MessageConfirmed) (*model.Address, error) {
@@ -293,15 +293,9 @@ func (r *queryResolver) MsigPending(ctx context.Context, address *string, limit 
 			item.Params = &obj
 		}
 
-		if iter.Params != nil {
-			// confirm the hashes match
-			var rt runtime.Runtime
-			rt.ValidateImmediateCallerType(builtin.CallerTypesSignable...)
-			txn := &multisig.Transaction{To: iter.To, Value: iter.Value, Method: iter.Method, Params: iter.Params, Approved: iter.Approved}
-
-			calculatedHash, _ := multisig.ComputeProposalHash(txn, rt.HashBlake2b)
-			item.ProposalHash = base64.URLEncoding.EncodeToString(calculatedHash)
-		}
+		txn := &multisig.Transaction{To: iter.To, Value: iter.Value, Method: iter.Method, Params: iter.Params, Approved: iter.Approved}
+		calculatedHash, _ := multisig.ComputeProposalHash(txn, blake2b.Sum256)
+		item.ProposalHash = base64.URLEncoding.EncodeToString(calculatedHash)
 
 		toaddr, _ := r.NodeService.AddressLookup(iter.To.String())
 		item.To = toaddr
