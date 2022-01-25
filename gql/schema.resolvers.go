@@ -295,7 +295,7 @@ func (r *queryResolver) MsigPending(ctx context.Context, address *string, limit 
 
 		txn := &multisig.Transaction{To: iter.To, Value: iter.Value, Method: iter.Method, Params: iter.Params, Approved: iter.Approved}
 		calculatedHash, _ := multisig.ComputeProposalHash(txn, blake2b.Sum256)
-		item.ProposalHash = base64.URLEncoding.EncodeToString(calculatedHash)
+		item.ProposalHash = base64.StdEncoding.EncodeToString(calculatedHash)
 
 		toaddr, _ := r.NodeService.AddressLookup(iter.To.String())
 		item.To = toaddr
