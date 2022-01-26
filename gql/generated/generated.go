@@ -1061,7 +1061,7 @@ scalar Uint64
 
 type Query {
   block(address: String!, height: Int64!): Block!
-  message(cid: String): MessageConfirmed!
+  message(cid: String): MessageConfirmed
   messages(address: String, limit: Int = 5, offset: Int = 0): [Message!]!
   pendingMessage(cid: String!): MessagePending! #mempool
   pendingMessages(
@@ -4385,14 +4385,11 @@ func (ec *executionContext) _Query_message(ctx context.Context, field graphql.Co
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
 	res := resTmp.(*model.MessageConfirmed)
 	fc.Result = res
-	return ec.marshalNMessageConfirmed2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageConfirmed(ctx, field.Selections, res)
+	return ec.marshalOMessageConfirmed2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageConfirmed(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_messages(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -6888,9 +6885,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_message(ctx, field)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
 				return res
 			})
 		case "messages":

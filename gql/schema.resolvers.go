@@ -82,6 +82,11 @@ func (r *queryResolver) Message(ctx context.Context, cid *string) (*model.Messag
 	if err != nil {
 		return nil, err
 	}
+
+	if msg == nil {
+		return nil, nil
+	}
+
 	var item model.MessageConfirmed
 	copier.Copy(&item, &msg)
 	if msg.ParsedMessage != nil {
