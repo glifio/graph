@@ -1063,7 +1063,7 @@ type Query {
   block(address: String!, height: Int64!): Block!
   message(cid: String): MessageConfirmed
   messages(address: String, limit: Int = 5, offset: Int = 0): [Message!]!
-  pendingMessage(cid: String!): MessagePending! #mempool
+  pendingMessage(cid: String!): MessagePending #mempool
   pendingMessages(
     address: String
     limit: Int = 5
@@ -4466,14 +4466,11 @@ func (ec *executionContext) _Query_pendingMessage(ctx context.Context, field gra
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
 	res := resTmp.(*model.MessagePending)
 	fc.Result = res
-	return ec.marshalNMessagePending2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessagePending(ctx, field.Selections, res)
+	return ec.marshalOMessagePending2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessagePending(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_pendingMessages(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -6910,9 +6907,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_pendingMessage(ctx, field)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
 				return res
 			})
 		case "pendingMessages":
@@ -7645,10 +7639,6 @@ func (ec *executionContext) marshalNMessageConfirmed2ᚖgithubᚗcomᚋglifioᚋ
 	return ec._MessageConfirmed(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNMessagePending2githubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessagePending(ctx context.Context, sel ast.SelectionSet, v model.MessagePending) graphql.Marshaler {
-	return ec._MessagePending(ctx, sel, &v)
-}
-
 func (ec *executionContext) marshalNMessagePending2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessagePendingᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.MessagePending) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
@@ -8329,6 +8319,13 @@ func (ec *executionContext) marshalOMessageConfirmed2ᚖgithubᚗcomᚋglifioᚋ
 		return graphql.Null
 	}
 	return ec._MessageConfirmed(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOMessagePending2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessagePending(ctx context.Context, sel ast.SelectionSet, v *model.MessagePending) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._MessagePending(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOString2string(ctx context.Context, v interface{}) (string, error) {
