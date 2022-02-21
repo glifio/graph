@@ -7,10 +7,12 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/filecoin-project/lily/model/derived"
 	"github.com/filecoin-project/specs-actors/actors/builtin"
@@ -418,13 +420,8 @@ func (r *subscriptionResolver) Messages(ctx context.Context) (<-chan []*model.Me
 
 func (r *subscriptionResolver) ChainHead(ctx context.Context) (<-chan *model.ChainHead, error) {
 	if r.ChainSubs == nil {
-		chain, err := r.NodeService.ChainHeadSub(context.TODO())
-		if err != nil {
-			return nil, err
-		}
 
 		r.ChainSubs = &Sub{
-			Headchange: chain,
 			Height:     0,
 			Observers: map[uuid.UUID]struct {
 				HeadChange chan *model.ChainHead
@@ -432,25 +429,40 @@ func (r *subscriptionResolver) ChainHead(ctx context.Context) (<-chan *model.Cha
 		}
 
 		go func() {
-			fmt.Printf("create chainhead listener\n")
 			var current int64
 
-			for headchanges := range r.ChainSubs.Headchange {
-				var res *model.ChainHead
-				for _, elem := range headchanges {
-					current = int64(elem.Val.Height())
-					res = &model.ChainHead{Height: int64(elem.Val.Height())}
-				}
-				if current > r.ChainSubs.Height {
-					r.ChainSubs.Height = current
-					r.mu.Lock()
-					for _, observer := range r.ChainSubs.Observers {
-						observer.HeadChange <- res
+			for {
+				for {				
+					log.Printf("subscribe to chainhead\n")
+					chain, err := r.NodeService.ChainHeadSub(context.TODO())
+
+					if err == nil {
+						r.ChainSubs.Headchange = chain
+						log.Printf("subscription success\n")
+						break
 					}
-					r.mu.Unlock()
+
+					log.Printf("...subscription failed: %s\n", err)
+					time.Sleep(15 * time.Second)
 				}
+
+				for headchanges := range r.ChainSubs.Headchange {
+					var res *model.ChainHead
+					for _, elem := range headchanges {
+						current = int64(elem.Val.Height())
+						res = &model.ChainHead{Height: int64(elem.Val.Height())}
+					}
+					if current > r.ChainSubs.Height {
+						r.ChainSubs.Height = current
+						r.mu.Lock()
+						for _, observer := range r.ChainSubs.Observers {
+							observer.HeadChange <- res
+						}
+						r.mu.Unlock()
+					}
+				}
+				log.Printf("subscription stalled\n")
 			}
-			fmt.Printf("delete listen\n")
 		}()
 	}
 
@@ -461,7 +473,7 @@ func (r *subscriptionResolver) ChainHead(ctx context.Context) (<-chan *model.Cha
 		<-ctx.Done()
 		r.mu.Lock()
 		delete(r.ChainSubs.Observers, id)
-		fmt.Printf("delete observer[%d]: %s\n", len(r.ChainSubs.Observers), id.String())
+		log.Printf("delete observer[%d]: %s\n", len(r.ChainSubs.Observers), id.String())
 		r.mu.Unlock()
 	}()
 
@@ -472,7 +484,7 @@ func (r *subscriptionResolver) ChainHead(ctx context.Context) (<-chan *model.Cha
 	if r.ChainSubs.Height != 0 {
 		events <- &model.ChainHead{Height: r.ChainSubs.Height}
 	}
-	fmt.Printf("add observer[%d]: %s\n", len(r.ChainSubs.Observers), id.String())
+	log.Printf("add observer[%d]: %s\n", len(r.ChainSubs.Observers), id.String())
 	r.mu.Unlock()
 
 	return events, nil

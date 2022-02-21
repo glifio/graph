@@ -210,9 +210,6 @@ func (t *Node) ChainHead(ctx context.Context) (*types.TipSet, error) {
 
 func (t *Node) ChainHeadSub(ctx context.Context) (<-chan []*lotusapi.HeadChange, error) {
 	headchange, err := t.api.ChainNotify(ctx)
-	if err != nil {
-		log.Fatal(err)
-	}
 	return headchange, err
 }
 
