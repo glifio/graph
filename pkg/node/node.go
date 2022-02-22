@@ -16,6 +16,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/glifio/graph/gql/model"
 	"github.com/ipfs/go-cid"
+	"github.com/spf13/viper"
 )
 
 type NodeInterface interface {
@@ -111,10 +112,13 @@ func (t *Node) GetMessage(id string) (*types.Message, error) {
 func (t *Node) StateSearchMsg(id string) (*lotusapi.MsgLookup, error){
 	c, err := cid.Decode(id)
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
+		return nil, err
 	}
-	
-	msg, err := t.api.StateSearchMsg(context.Background(), c)
+
+	confidence := viper.GetInt("confidence")
+
+	msg, err := t.api.StateSearchMsgLimited(context.Background(), c, abi.ChainEpoch(confidence))
 
 	return msg, err
 }

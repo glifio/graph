@@ -374,17 +374,21 @@ func (r *queryResolver) StateListMessages(ctx context.Context, address string) (
 func (r *queryResolver) MessageLowConfidence(ctx context.Context, cid string) (*model.MessageConfirmed, error) {
 	var item model.MessageConfirmed
 
-	iter, err := r.NodeService.StateReplay(ctx, cid)
+	statemsg, err := r.NodeService.StateSearchMsg(cid)
 	if err != nil {
 		return nil, err
 	}
 
-	statemsg, err := r.NodeService.StateSearchMsg(cid)
+	if statemsg == nil {
+		return nil, fmt.Errorf("not found")
+	}
+	
+	iter, err := r.NodeService.StateReplay(ctx, cid)
 	if err != nil {
 		return nil, err
-	} else {
-		item.Height = int64(statemsg.Height)
 	}
+	
+	item.Height = int64(statemsg.Height)
 
 	item.Cid = iter.MsgCid.String()
 	item.Version = int(iter.Msg.Version)

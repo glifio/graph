@@ -71,6 +71,7 @@ func init() {
 	viper.BindEnv("db_schema")
 	viper.BindEnv("lotus_token")
 	viper.BindEnv("lotus_addr")
+	viper.BindEnv("confidence")
 
 	rootCmd.Flags().VisitAll(func(f *pflag.Flag) {
 		// Environment variables can't have dashes in them, so bind them to their equivalent
