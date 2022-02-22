@@ -492,13 +492,8 @@ func (r *subscriptionResolver) ChainHead(ctx context.Context) (<-chan *model.Cha
 
 func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string) (<-chan *model.MpoolUpdate, error) {
 	if r.MpoolObserver == nil {
-		mpoolsub, err := r.NodeService.MpoolSub(context.TODO())
-		if err != nil {
-			return nil, err
-		}
 
 		r.MpoolObserver = &MpoolObserver{
-			channel: mpoolsub,
 			Observers: map[uuid.UUID]struct {
 				address string
 				update  chan *model.MpoolUpdate
@@ -506,47 +501,61 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 		}
 
 		go func() {
-			fmt.Printf("create mpoolupdate listener\n")
+			for {
+				for {				
+					log.Printf("subscribe to mpoolsub\n")
+					mpoolsub, err := r.NodeService.MpoolSub(context.TODO())
 
-			for msg := range r.MpoolObserver.channel {
-				var res model.MpoolUpdate
-
-				res.Type = (*int)(&msg.Type)
-				res.Message = &model.MessagePending{}
-				res.Message.Cid = msg.Message.Cid().String()
-				res.Message.Version = strconv.FormatUint(msg.Message.Message.Version, 10)
-				fromaddr, _ := r.NodeService.AddressLookup(msg.Message.Message.From.String())
-				res.Message.From = fromaddr
-				toaddr, _ := r.NodeService.AddressLookup(msg.Message.Message.To.String())
-				res.Message.To = toaddr
-				nonce := strconv.FormatUint(msg.Message.Message.Nonce, 10)
-				res.Message.Nonce = &nonce
-				res.Message.Value = msg.Message.Message.Value.String()
-				gaslimit := strconv.FormatInt(msg.Message.Message.GasLimit, 10)
-				res.Message.GasLimit = &gaslimit
-				gasfeecap := msg.Message.Message.GasFeeCap.String()
-				res.Message.GasFeeCap = &gasfeecap
-				gaspremium := msg.Message.Message.GasPremium.String()
-				res.Message.GasPremium = &gaspremium
-				res.Message.Method = msg.Message.Message.Method.String()
-
-				obj, err := r.NodeService.StateDecodeParams(msg.Message.Message.To, msg.Message.Message.Method, msg.Message.Message.Params)
-
-				if err == nil && obj != "" {
-					res.Message.Params = &obj
-				}
-
-				r.mu.Lock()
-				for _, observer := range r.MpoolObserver.Observers {
-					if res.Message.From.Robust == observer.address || res.Message.To.Robust == observer.address ||
-						res.Message.From.ID == observer.address || res.Message.To.ID == observer.address {
-						//fmt.Printf("update: %s cid: %s\n", observer.address, res.Message.Cid)
-						observer.update <- &res
+					if err == nil {
+						r.MpoolObserver.channel = mpoolsub
+						log.Printf("mpoolsub subscription success\n")
+						break
 					}
+
+					log.Printf("...mpoolsub subscription failed: %s\n", err)
+					time.Sleep(15 * time.Second)
 				}
-				r.mu.Unlock()
+
+				for msg := range r.MpoolObserver.channel {
+					var res model.MpoolUpdate
+
+					res.Type = (*int)(&msg.Type)
+					res.Message = &model.MessagePending{}
+					res.Message.Cid = msg.Message.Cid().String()
+					res.Message.Version = strconv.FormatUint(msg.Message.Message.Version, 10)
+					fromaddr, _ := r.NodeService.AddressLookup(msg.Message.Message.From.String())
+					res.Message.From = fromaddr
+					toaddr, _ := r.NodeService.AddressLookup(msg.Message.Message.To.String())
+					res.Message.To = toaddr
+					nonce := strconv.FormatUint(msg.Message.Message.Nonce, 10)
+					res.Message.Nonce = &nonce
+					res.Message.Value = msg.Message.Message.Value.String()
+					gaslimit := strconv.FormatInt(msg.Message.Message.GasLimit, 10)
+					res.Message.GasLimit = &gaslimit
+					gasfeecap := msg.Message.Message.GasFeeCap.String()
+					res.Message.GasFeeCap = &gasfeecap
+					gaspremium := msg.Message.Message.GasPremium.String()
+					res.Message.GasPremium = &gaspremium
+					res.Message.Method = msg.Message.Message.Method.String()
+
+					obj, err := r.NodeService.StateDecodeParams(msg.Message.Message.To, msg.Message.Message.Method, msg.Message.Message.Params)
+
+					if err == nil && obj != "" {
+						res.Message.Params = &obj
+					}
+
+					r.mu.Lock()
+					for _, observer := range r.MpoolObserver.Observers {
+						if res.Message.From.Robust == observer.address || res.Message.To.Robust == observer.address ||
+							res.Message.From.ID == observer.address || res.Message.To.ID == observer.address {
+							//fmt.Printf("update: %s cid: %s\n", observer.address, res.Message.Cid)
+							observer.update <- &res
+						}
+					}
+					r.mu.Unlock()
+				}
+				log.Printf("mpoolsub subscription stalled\n")
 			}
-			fmt.Printf("delete listen\n")
 		}()
 	}
 
@@ -557,7 +566,7 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 		<-ctx.Done()
 		r.mu.Lock()
 		delete(r.MpoolObserver.Observers, id)
-		fmt.Printf("delete observer[%d]: %s\n", len(r.MpoolObserver.Observers), id.String())
+		log.Printf("delete mpoolsub observer[%d]: %s\n", len(r.MpoolObserver.Observers), id.String())
 		r.mu.Unlock()
 	}()
 
@@ -567,7 +576,7 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 		update  chan *model.MpoolUpdate
 	}{address: *address, update: events}
 	//events <- &model.MpoolUpdate{Height: r.ChainSubs.Height}
-	fmt.Printf("add observer[%d]: %s\n", len(r.MpoolObserver.Observers), id.String())
+	log.Printf("add mpoolsub observer[%d]: %s\n", len(r.MpoolObserver.Observers), id.String())
 	r.mu.Unlock()
 
 	return events, nil

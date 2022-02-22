@@ -215,9 +215,6 @@ func (t *Node) ChainHeadSub(ctx context.Context) (<-chan []*lotusapi.HeadChange,
 
 func (t *Node) MpoolSub(ctx context.Context) (<-chan lotusapi.MpoolUpdate, error) {
 	mpool, err := t.api.MpoolSub(ctx)
-	if err != nil {
-		log.Fatal(err)
-	}
 	return mpool, err
 }
 
