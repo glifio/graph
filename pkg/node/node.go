@@ -154,6 +154,8 @@ func (t *Node) MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error) 
 
 func (t *Node) StateListMessages(ctx context.Context, addr string)([]*lotusapi.InvocResult, error){
 	var out []cid.Cid
+	var res []cid.Cid
+
 	tipset, err := t.api.ChainHead(ctx)
 	if err != nil {
 		return nil, err
@@ -164,32 +166,34 @@ func (t *Node) StateListMessages(ctx context.Context, addr string)([]*lotusapi.I
 	robust, _ := t.AddressGetRobust(addr)	
 	id, _ := t.AddressGetID(addr)
 
-	res, err := t.api.StateListMessages(ctx, &lotusapi.MessageMatch{From: id}, types.EmptyTSK, tipset.Height()-abi.ChainEpoch(lookback))
-	if err == nil {
-		out = append(out, res...)
+	if !id.Empty() {
+		res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{From: id}, types.EmptyTSK, tipset.Height()-abi.ChainEpoch(lookback))
+		if err == nil {
+			out = append(out, res...)
+		}
+		res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{To: id}, types.EmptyTSK, tipset.Height()-35)
+		if err == nil {
+			out = append(out, res...)
+		}
 	}
 
-	res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{From: robust}, types.EmptyTSK, tipset.Height()-35)
-	if err == nil {
-		out = append(out, res...)
-	}
+	if !robust.Empty() {
+		res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{From: robust}, types.EmptyTSK, tipset.Height()-35)
+		if err == nil {
+			out = append(out, res...)
+		}
 
-	res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{To: id}, types.EmptyTSK, tipset.Height()-35)
-	if err == nil {
-		out = append(out, res...)
-	}
-
-	res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{To: robust}, types.EmptyTSK, tipset.Height()-35)
-	if err == nil {
-		out = append(out, res...)
+		res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{To: robust}, types.EmptyTSK, tipset.Height()-35)
+		if err == nil {
+			out = append(out, res...)
+		}	
 	}
 
 	var invoc []*lotusapi.InvocResult
 	for _, iter := range out {
 		replay, err := t.api.StateReplay(ctx, types.EmptyTSK, iter)
 		if err != nil {
-			//return nil, err
-			fmt.Printf("error: %s\n", err)
+			log.Printf("StateListMessages: %s\n", err)
 		} else {
 			invoc = append(invoc, replay)
 		}
