@@ -14,20 +14,16 @@ const (
 	defaultConfigFilename = "graph"
 
 	// The environment variable prefix of all environment variables bound to our command line flags.
-	// For example, --number is bound to GIRAPH_NUMBER.
-	envPrefix = "GIRAPH"
+	// For example, --number is bound to GRAPH_NUMBER.
+	envPrefix = "GRAPH"
 )
 
 var (
 	// Used for flags.
 	cfgFile     string
-	userLicense string
 	
 	flag_address string // blob key
 	flag_method uint64 // blob raw data (or '-' for stdin)
-	actorType string // blob file location
-
-	author string
 
 	rootCmd = &cobra.Command{
 		Use:   "graph",
@@ -103,7 +99,7 @@ func initConfig() {
 		viper.SetConfigType("env")
 	}
 
-	viper.SetEnvPrefix("giraph")
+	viper.SetEnvPrefix(envPrefix)
 	viper.AutomaticEnv()
 	
 	if err := viper.ReadInConfig(); err == nil {
