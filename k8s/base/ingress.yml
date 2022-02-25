@@ -1,0 +1,30 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: graph-ingress
+  annotations:
+    kubernetes.io/ingress.global-static-ip-name: glif-link
+    networking.gke.io/managed-certificates: calibration-graph-certificate, mainnet-graph-certificate
+    # kubernetes.io/ingress.allow-http: "false"
+spec:
+  rules:
+    - host: graph-calibration.glif.link
+      http:
+        paths:
+          - pathType: ImplementationSpecific
+            path: /*
+            backend:
+              service:
+                name: calibration-graph-service
+                port:
+                  number: 80
+    - host: graph.glif.link
+      http:
+        paths:
+          - pathType: ImplementationSpecific
+            path: /*
+            backend:
+              service:
+                name: mainnet-graph-service
+                port:
+                  number: 80

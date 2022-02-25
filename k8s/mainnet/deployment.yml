@@ -1,0 +1,101 @@
+# Copyright 2019 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mainnet-graph-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mainnet-graph-deployment
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  minReadySeconds: 5
+  template:
+    metadata:
+      labels:
+        app: mainnet-graph-deployment
+    spec:
+      containers:
+        - name: mainnet-graph-deployment
+          image: gcr.io/PROJECT_ID/IMAGE:TAG
+          env:
+            - name: GRAPH_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: mainnet-graph-credentials
+                  key: PORT
+            - name: GRAPH_DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: mainnet-graph-credentials
+                  key: DB_HOST
+            - name: GRAPH_DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: mainnet-graph-credentials
+                  key: DB_PORT
+            - name: GRAPH_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mainnet-graph-credentials
+                  key: DB_USER
+            - name: GRAPH_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mainnet-graph-credentials
+                  key: DB_PASSWORD
+            - name: GRAPH_DB_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: mainnet-graph-credentials
+                  key: DB_DATABASE
+            - name: GRAPH_DB_SCHEMA
+              valueFrom:
+                secretKeyRef:
+                  name: mainnet-graph-credentials
+                  key: DB_SCHEMA
+            - name: GRAPH_LOTUS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: mainnet-graph-credentials
+                  key: LOTUS_TOKEN
+            - name: GRAPH_LOTUS_ADDR
+              valueFrom:
+                secretKeyRef:
+                  name: mainnet-graph-credentials
+                  key: LOTUS_ADDR
+            - name: GRAPH_CONFIDENCE
+              valueFrom:
+                secretKeyRef:
+                  name: mainnet-graph-credentials
+                  key: CONFIDENCE
+          ports:
+            - containerPort: 9090
+          livenessProbe:
+            httpGet:
+              path: /query
+              port: 9090
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /query
+              port: 9090
+            initialDelaySeconds: 10
+            periodSeconds: 10
