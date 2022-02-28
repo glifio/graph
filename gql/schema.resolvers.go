@@ -402,6 +402,8 @@ func (r *queryResolver) MessageLowConfidence(ctx context.Context, cid string) (*
 	gaspremium := iter.Msg.GasPremium.String()
 	item.GasPremium = gaspremium
 	item.Method = uint64(iter.Msg.Method)
+	item.GasUsed = iter.GasCost.GasUsed.Int64()
+	_, item.GasBurned = util.ComputeGasOverestimationBurn(iter.GasCost.GasUsed.Int64(), iter.Msg.GasLimit)
 	item.MinerTip = iter.GasCost.MinerTip.String()
 	item.BaseFeeBurn = iter.GasCost.BaseFeeBurn.String()
 	item.OverEstimationBurn = iter.GasCost.OverEstimationBurn.String()
