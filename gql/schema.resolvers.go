@@ -79,8 +79,8 @@ func (r *queryResolver) Block(ctx context.Context, address string, height int64)
 	return &item, err
 }
 
-func (r *queryResolver) Message(ctx context.Context, cid *string) (*model.MessageConfirmed, error) {
-	msg, err := r.MessageConfirmedService.Get(*cid)
+func (r *queryResolver) Message(ctx context.Context, cid string, height *int) (*model.MessageConfirmed, error) {
+	msg, err := r.MessageConfirmedService.Get(cid, height)
 	if err != nil {
 		return nil, err
 	}
@@ -382,12 +382,12 @@ func (r *queryResolver) MessageLowConfidence(ctx context.Context, cid string) (*
 	if statemsg == nil {
 		return nil, fmt.Errorf("not found")
 	}
-	
+
 	iter, err := r.NodeService.StateReplay(ctx, cid)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	item.Height = int64(statemsg.Height)
 
 	item.Cid = iter.MsgCid.String()
@@ -426,7 +426,7 @@ func (r *subscriptionResolver) ChainHead(ctx context.Context) (<-chan *model.Cha
 	if r.ChainSubs == nil {
 
 		r.ChainSubs = &Sub{
-			Height:     0,
+			Height: 0,
 			Observers: map[uuid.UUID]struct {
 				HeadChange chan *model.ChainHead
 			}{},
@@ -436,7 +436,7 @@ func (r *subscriptionResolver) ChainHead(ctx context.Context) (<-chan *model.Cha
 			var current int64
 
 			for {
-				for {				
+				for {
 					log.Printf("subscribe to chainhead\n")
 					chain, err := r.NodeService.ChainHeadSub(context.TODO())
 
@@ -506,7 +506,7 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 
 		go func() {
 			for {
-				for {				
+				for {
 					log.Printf("subscribe to mpoolsub\n")
 					mpoolsub, err := r.NodeService.MpoolSub(context.TODO())
 

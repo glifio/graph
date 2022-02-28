@@ -157,7 +157,7 @@ type ComplexityRoot struct {
 		Actors               func(childComplexity int) int
 		Address              func(childComplexity int, str string) int
 		Block                func(childComplexity int, address string, height int64) int
-		Message              func(childComplexity int, cid *string) int
+		Message              func(childComplexity int, cid string, height *int) int
 		MessageLowConfidence func(childComplexity int, cid string) int
 		Messages             func(childComplexity int, address *string, limit *int, offset *int) int
 		MessagesConfirmed    func(childComplexity int, address *string, limit *int, offset *int) int
@@ -194,7 +194,7 @@ type MessageConfirmedResolver interface {
 }
 type QueryResolver interface {
 	Block(ctx context.Context, address string, height int64) (*model.Block, error)
-	Message(ctx context.Context, cid *string) (*model.MessageConfirmed, error)
+	Message(ctx context.Context, cid string, height *int) (*model.MessageConfirmed, error)
 	Messages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.Message, error)
 	PendingMessage(ctx context.Context, cid string) (*model.MessagePending, error)
 	PendingMessages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessagePending, error)
@@ -845,7 +845,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.Message(childComplexity, args["cid"].(*string)), true
+		return e.complexity.Query.Message(childComplexity, args["cid"].(string), args["height"].(*int)), true
 
 	case "Query.messageLowConfidence":
 		if e.complexity.Query.MessageLowConfidence == nil {
@@ -1061,7 +1061,7 @@ scalar Uint64
 
 type Query {
   block(address: String!, height: Int64!): Block!
-  message(cid: String): MessageConfirmed
+  message(cid: String!, height: Int): MessageConfirmed
   messages(address: String, limit: Int = 5, offset: Int = 0): [Message!]!
   pendingMessage(cid: String!): MessagePending #mempool
   pendingMessages(
@@ -1331,15 +1331,24 @@ func (ec *executionContext) field_Query_messageLowConfidence_args(ctx context.Co
 func (ec *executionContext) field_Query_message_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 *string
+	var arg0 string
 	if tmp, ok := rawArgs["cid"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("cid"))
-		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
 	args["cid"] = arg0
+	var arg1 *int
+	if tmp, ok := rawArgs["height"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("height"))
+		arg1, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["height"] = arg1
 	return args, nil
 }
 
@@ -4378,7 +4387,7 @@ func (ec *executionContext) _Query_message(ctx context.Context, field graphql.Co
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Message(rctx, args["cid"].(*string))
+		return ec.resolvers.Query().Message(rctx, args["cid"].(string), args["height"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)

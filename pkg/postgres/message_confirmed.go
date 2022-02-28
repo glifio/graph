@@ -24,13 +24,22 @@ func (t *MessageConfirmed) Init(db Database) error {
 	return nil
 }
 
-func (t *MessageConfirmed) Get(id string) (*lily.GasOutputs, error) {
+func (t *MessageConfirmed) Get(id string, height *int) (*lily.GasOutputs, error) {
 	// Select message
     var msgs []lily.GasOutputs
-    var err = t.db.Db.Model(&msgs).
-		Relation("ParsedMessage").  // left join parsed msg to get params
-		Where("gas_outputs.cid = ?", id).
-		Select()
+	var err error = nil
+
+	if height != nil {
+		err = t.db.Db.Model(&msgs).
+			Relation("ParsedMessage").  // left join parsed msg to get params
+			Where("gas_outputs.cid = ? and gas_outputs.height = ?", id, *height).
+			Select()
+	} else {
+		err = t.db.Db.Model(&msgs).
+			Relation("ParsedMessage").  // left join parsed msg to get params
+			Where("gas_outputs.cid = ?", id).
+			Select()
+	}
 	if err != nil {
 		return nil, err
 	}
