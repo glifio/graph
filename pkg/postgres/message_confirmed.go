@@ -1,6 +1,8 @@
 package postgres
 
 import (
+	"sort"
+
 	"github.com/filecoin-project/lily/model/derived"
 	"github.com/glifio/graph/gql/model"
 	"github.com/glifio/graph/pkg/lily"
@@ -46,15 +48,29 @@ func (t *MessageConfirmed) List(address *string, limit *int, offset *int) ([]der
     var err = t.db.Db.Model(&msgs).
 		Where("gas_outputs.from = ?", *address).
 		WhereOr("gas_outputs.to = ?", *address).
-		Order("gas_outputs.height desc").
-		Limit(*limit).
-		Offset(*offset).
 		Select()
 	if err != nil {
 		return nil, err
 	}
 
-	return msgs, nil
+	// sort the result by height desc
+	sort.Slice(msgs, func(i, j int) bool {
+		return msgs[i].Height > msgs[j].Height
+	})
+
+	// limit and offset
+	_limit := *limit
+	_offset := *offset
+	var res []derived.GasOutputs
+	if(_offset > len(msgs)){
+		return res, nil
+	}
+	if(_offset + _limit > len(msgs)){
+		_limit = len(msgs)-_offset
+	}
+    res = msgs[_offset:_offset+_limit]
+
+	return res, nil
 }
 
 func (t *MessageConfirmed) Search(address *model.Address, limit *int, offset *int) ([]derived.GasOutputs, error) {
@@ -65,13 +81,27 @@ func (t *MessageConfirmed) Search(address *model.Address, limit *int, offset *in
 		WhereOr("gas_outputs.from = ?", address.Robust).
 		WhereOr("gas_outputs.to = ?", address.ID).
 		WhereOr("gas_outputs.to = ?", address.Robust).
-		Order("gas_outputs.height desc").
-		Limit(*limit).
-		Offset(*offset).
 		Select()
 	if err != nil {
 		return nil, err
 	}
 
-	return msgs, nil
+	// sort the result by height desc
+	sort.Slice(msgs, func(i, j int) bool {
+		return msgs[i].Height > msgs[j].Height
+	})
+
+	// limit and offset
+	_limit := *limit
+	_offset := *offset
+	var res []derived.GasOutputs
+	if(_offset > len(msgs)){
+		return res, nil
+	}
+	if(_offset + _limit > len(msgs)){
+		_limit = len(msgs)-_offset
+	}
+    res = msgs[_offset:_offset+_limit]
+
+	return res, nil
 }

@@ -245,7 +245,8 @@ func (t *Node) AddressLookup(id string) (*model.Address, error){
 	result := &model.Address{ID: "", Robust: ""}
 	addr, err := address.NewFromString(id)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return nil, err		
 	}
 	var rs address.Address
 	switch(addr.Protocol()){
