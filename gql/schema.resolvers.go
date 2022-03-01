@@ -172,38 +172,41 @@ func (r *queryResolver) PendingMessages(ctx context.Context, address *string, li
 		return nil, err
 	}
 
+	queryAddress, _ := r.NodeService.AddressLookup(*address)
+
 	for _, item := range pending {
 		var msg model.MessagePending
-		msg.Cid = item.Cid().String()
-		msg.Version = strconv.FormatUint(item.Message.Version, 10)
-		msg.Method = item.Message.Method.String()
-		msg.GasFeeCap = new(string)
-		var gasfeecap = item.Message.GasFeeCap.String()
-		msg.GasFeeCap = &gasfeecap
 
-		msg.Value = item.Message.Value.String()
+		if queryAddress.Robust == item.Message.From.String() || queryAddress.Robust == item.Message.To.String() || 
+		queryAddress.ID == item.Message.From.String() || queryAddress.ID == item.Message.To.String() {
 
-		fromaddr, _ := r.NodeService.AddressLookup(item.Message.From.String())
-		msg.From = fromaddr
-		toaddr, _ := r.NodeService.AddressLookup(item.Message.To.String())
-		msg.To = toaddr
+			msg.Cid = item.Cid().String()
+			msg.Version = strconv.FormatUint(item.Message.Version, 10)
+			msg.Method = item.Message.Method.String()
+			msg.GasFeeCap = new(string)
+			var gasfeecap = item.Message.GasFeeCap.String()
+			msg.GasFeeCap = &gasfeecap
 
-		msg.GasPremium = new(string)
-		var gasPremium = item.Message.GasPremium.String()
-		msg.GasPremium = &gasPremium
+			// todo optimize
+		    fromaddr, _ := r.NodeService.AddressLookup(item.Message.From.String())
+		    msg.From = fromaddr
+		    toaddr, _ := r.NodeService.AddressLookup(item.Message.To.String())
+		    msg.To = toaddr
+		
+			msg.Value = item.Message.Value.String()
+						
+			msg.GasPremium = new(string)
+			var gasPremium = item.Message.GasPremium.String()
+			msg.GasPremium = &gasPremium
+		
+			var gaslimit = strconv.FormatInt(item.Message.GasLimit, 10)
+			msg.GasLimit = &gaslimit
 
-		var gaslimit = strconv.FormatInt(item.Message.GasLimit, 10)
-		msg.GasLimit = &gaslimit
-
-		obj, err := r.NodeService.StateDecodeParams(item.Message.To, item.Message.Method, item.Message.Params)
-
-		if err == nil && obj != "" {
-			msg.Params = &obj
-		}
-
-		// todo optimize
-		if msg.From.Robust == *address || msg.To.Robust == *address ||
-			msg.From.ID == *address || msg.To.ID == *address {
+			obj, err := r.NodeService.StateDecodeParams(item.Message.To, item.Message.Method, item.Message.Params)
+			if err == nil && obj != "" {
+				msg.Params = &obj
+			}
+							
 			items = append(items, &msg)
 		}
 	}
