@@ -177,8 +177,8 @@ func (r *queryResolver) PendingMessages(ctx context.Context, address *string, li
 	for _, item := range pending {
 		var msg model.MessagePending
 
-		if queryAddress.Robust == item.Message.From.String() || queryAddress.Robust == item.Message.To.String() || 
-		queryAddress.ID == item.Message.From.String() || queryAddress.ID == item.Message.To.String() {
+		if queryAddress.Robust == item.Message.From.String() || queryAddress.Robust == item.Message.To.String() ||
+			queryAddress.ID == item.Message.From.String() || queryAddress.ID == item.Message.To.String() {
 
 			msg.Cid = item.Cid().String()
 			msg.Version = strconv.FormatUint(item.Message.Version, 10)
@@ -188,17 +188,17 @@ func (r *queryResolver) PendingMessages(ctx context.Context, address *string, li
 			msg.GasFeeCap = &gasfeecap
 
 			// todo optimize
-		    fromaddr, _ := r.NodeService.AddressLookup(item.Message.From.String())
-		    msg.From = fromaddr
-		    toaddr, _ := r.NodeService.AddressLookup(item.Message.To.String())
-		    msg.To = toaddr
-		
+			fromaddr, _ := r.NodeService.AddressLookup(item.Message.From.String())
+			msg.From = fromaddr
+			toaddr, _ := r.NodeService.AddressLookup(item.Message.To.String())
+			msg.To = toaddr
+
 			msg.Value = item.Message.Value.String()
-						
+
 			msg.GasPremium = new(string)
 			var gasPremium = item.Message.GasPremium.String()
 			msg.GasPremium = &gasPremium
-		
+
 			var gaslimit = strconv.FormatInt(item.Message.GasLimit, 10)
 			msg.GasLimit = &gaslimit
 
@@ -206,7 +206,7 @@ func (r *queryResolver) PendingMessages(ctx context.Context, address *string, li
 			if err == nil && obj != "" {
 				msg.Params = &obj
 			}
-							
+
 			items = append(items, &msg)
 		}
 	}
@@ -321,10 +321,10 @@ func (r *queryResolver) MsigPending(ctx context.Context, address *string, limit 
 	return items, nil
 }
 
-func (r *queryResolver) StateListMessages(ctx context.Context, address string) ([]*model.MessageConfirmed, error) {
+func (r *queryResolver) StateListMessages(ctx context.Context, address string, lookback *int) ([]*model.MessageConfirmed, error) {
 	var items []*model.MessageConfirmed
 
-	pending, err := r.NodeService.StateListMessages(ctx, address)
+	pending, err := r.NodeService.StateListMessages(ctx, address, *lookback)
 	if err != nil {
 		return nil, err
 	}

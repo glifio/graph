@@ -164,7 +164,7 @@ type ComplexityRoot struct {
 		MsigPending          func(childComplexity int, address *string, limit *int, offset *int) int
 		PendingMessage       func(childComplexity int, cid string) int
 		PendingMessages      func(childComplexity int, address *string, limit *int, offset *int) int
-		StateListMessages    func(childComplexity int, address string) int
+		StateListMessages    func(childComplexity int, address string, lookback *int) int
 	}
 
 	QueryMessage struct {
@@ -203,7 +203,7 @@ type QueryResolver interface {
 	Actor(ctx context.Context, address string) (*model.Actor, error)
 	Actors(ctx context.Context) ([]*model.Actor, error)
 	MsigPending(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MsigTransaction, error)
-	StateListMessages(ctx context.Context, address string) ([]*model.MessageConfirmed, error)
+	StateListMessages(ctx context.Context, address string, lookback *int) ([]*model.MessageConfirmed, error)
 	MessageLowConfidence(ctx context.Context, cid string) (*model.MessageConfirmed, error)
 }
 type SubscriptionResolver interface {
@@ -929,7 +929,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.StateListMessages(childComplexity, args["address"].(string)), true
+		return e.complexity.Query.StateListMessages(childComplexity, args["address"].(string), args["lookback"].(*int)), true
 
 	case "QueryMessage.messages":
 		if e.complexity.QueryMessage.Messages == nil {
@@ -1082,7 +1082,7 @@ type Query {
     limit: Int = 5
     offset: Int = 0
   ): [MsigTransaction!]!
-  stateListMessages(address: String!): [MessageConfirmed]
+  stateListMessages(address: String!, lookback: Int = 50): [MessageConfirmed]
   messageLowConfidence(cid: String!): MessageConfirmed!
 }
 
@@ -1511,6 +1511,15 @@ func (ec *executionContext) field_Query_stateListMessages_args(ctx context.Conte
 		}
 	}
 	args["address"] = arg0
+	var arg1 *int
+	if tmp, ok := rawArgs["lookback"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("lookback"))
+		arg1, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["lookback"] = arg1
 	return args, nil
 }
 
@@ -4746,7 +4755,7 @@ func (ec *executionContext) _Query_stateListMessages(ctx context.Context, field 
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().StateListMessages(rctx, args["address"].(string))
+		return ec.resolvers.Query().StateListMessages(rctx, args["address"].(string), args["lookback"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)

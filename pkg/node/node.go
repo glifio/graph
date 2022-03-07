@@ -26,7 +26,7 @@ type NodeInterface interface {
 	StateSearchMsg(id string) (*lotusapi.MsgLookup, error)
 	AddressLookup(id string) (*model.Address, error)
 	MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error)
-	StateListMessages(ctx context.Context, addr string)([]*lotusapi.InvocResult, error)
+	StateListMessages(ctx context.Context, addr string, lookback int)([]*lotusapi.InvocResult, error)
 	StateDecodeParams(id address.Address, p2 abi.MethodNum, p3 []byte) (string, error)
 	StateReplay(ctx context.Context, id string) (*lotusapi.InvocResult, error)
 
@@ -152,7 +152,7 @@ func (t *Node) MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error) 
 	return pending, err
 }
 
-func (t *Node) StateListMessages(ctx context.Context, addr string)([]*lotusapi.InvocResult, error){
+func (t *Node) StateListMessages(ctx context.Context, addr string, lookback int)([]*lotusapi.InvocResult, error){
 	var out []cid.Cid
 	var res []cid.Cid
 
@@ -161,7 +161,7 @@ func (t *Node) StateListMessages(ctx context.Context, addr string)([]*lotusapi.I
 		return nil, err
 	}
 
-	lookback := 35 
+	//lookback := 5
 
 	robust, _ := t.AddressGetRobust(addr)	
 	id, _ := t.AddressGetID(addr)
@@ -171,19 +171,19 @@ func (t *Node) StateListMessages(ctx context.Context, addr string)([]*lotusapi.I
 		if err == nil {
 			out = append(out, res...)
 		}
-		res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{To: id}, types.EmptyTSK, tipset.Height()-35)
+		res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{To: id}, types.EmptyTSK, tipset.Height()-abi.ChainEpoch(lookback))
 		if err == nil {
 			out = append(out, res...)
 		}
 	}
 
 	if !robust.Empty() {
-		res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{From: robust}, types.EmptyTSK, tipset.Height()-35)
+		res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{From: robust}, types.EmptyTSK, tipset.Height()-abi.ChainEpoch(lookback))
 		if err == nil {
 			out = append(out, res...)
 		}
 
-		res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{To: robust}, types.EmptyTSK, tipset.Height()-35)
+		res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{To: robust}, types.EmptyTSK, tipset.Height()-abi.ChainEpoch(lookback))
 		if err == nil {
 			out = append(out, res...)
 		}	

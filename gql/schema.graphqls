@@ -28,7 +28,7 @@ type Query {
     limit: Int = 5
     offset: Int = 0
   ): [MsigTransaction!]!
-  stateListMessages(address: String!): [MessageConfirmed]
+  stateListMessages(address: String!, lookback: Int = 50): [MessageConfirmed]
   messageLowConfidence(cid: String!): MessageConfirmed!
 }
 
