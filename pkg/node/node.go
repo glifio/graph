@@ -206,8 +206,8 @@ func (t *Node) SearchState(ctx context.Context, addr address.Address, limit *int
 	}
 
 	type SearchStateStruct struct {
-		message *types.Message
 		ts *types.TipSet
+		msg *lotusapi.Message
 	}
 
 	var t1 []*SearchStateStruct
@@ -219,8 +219,7 @@ func (t *Node) SearchState(ctx context.Context, addr address.Address, limit *int
 
 		for _, iter := range msgs {
 			if matchFunc(iter.Message) {
-				// todo create custom struct
-				t1 = append(t1, &SearchStateStruct{message: iter.Message, ts: ts})
+				t1 = append(t1, &SearchStateStruct{msg:&iter, ts: ts})
 			}
 		}
 
@@ -262,18 +261,18 @@ func (t *Node) SearchState(ctx context.Context, addr address.Address, limit *int
 
 	for _, iter := range t2 {
 		var item model.MessageConfirmed
-		item.Cid = iter.message.Cid().String()
+		item.Cid = iter.msg.Cid.String()
 		item.Height = int64(iter.ts.Height())
-		item.Value = iter.message.Value.String()
-		item.From = iter.message.From.String()
-		item.To = iter.message.To.String()
-		item.Nonce = iter.message.Nonce
-		item.Version = int(iter.message.Version)
-		item.GasFeeCap = iter.message.GasFeeCap.String()
-		item.GasLimit = iter.message.GasLimit
-		item.GasPremium = iter.message.GasPremium.String()
-		item.Method = uint64(iter.message.Method)
-		obj, err := t.StateDecodeParams(iter.message.To, iter.message.Method, iter.message.Params)
+		item.Value = iter.msg.Message.Value.String()
+		item.From = iter.msg.Message.From.String()
+		item.To = iter.msg.Message.To.String()
+		item.Nonce = iter.msg.Message.Nonce
+		item.Version = int(iter.msg.Message.Version)
+		item.GasFeeCap = iter.msg.Message.GasFeeCap.String()
+		item.GasLimit = iter.msg.Message.GasLimit
+		item.GasPremium = iter.msg.Message.GasPremium.String()
+		item.Method = uint64(iter.msg.Message.Method)
+		obj, err := t.StateDecodeParams(iter.msg.Message.To, iter.msg.Message.Method, iter.msg.Message.Params)
 		if err == nil && obj != "" {
 			item.Params = &obj
 		}
