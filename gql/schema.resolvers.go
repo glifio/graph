@@ -111,13 +111,11 @@ func (r *queryResolver) Messages(ctx context.Context, p1 string, limit *int, off
 
 	r1, count, err := r.NodeService.SearchState(ctx, a1, limit, offset, maxheight)
 	if err == nil {
-		log.Printf("search state: %d\n", len(r1))
-		for _, iter := range r1 {
-			items = append(items, &iter)
-		}
+		items = r1
 	}
 
 	log.Printf("messages: found in state: %d\n", len(r1))
+
 
 	if len(r1) >= *limit {
 		return items, nil

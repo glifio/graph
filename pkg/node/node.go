@@ -29,7 +29,7 @@ type NodeInterface interface {
 	StateSearchMsg(id string) (*lotusapi.MsgLookup, error)
 	AddressLookup(id string) (*model.Address, error)
 	MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error)
-	SearchState(ctx context.Context, addr address.Address, limit *int, offset *int, height int) ([]model.MessageConfirmed, int, error)
+	SearchState(ctx context.Context, addr address.Address, limit *int, offset *int, height int) ([]*model.MessageConfirmed, int, error)
 	StateListMessages(ctx context.Context, addr string, lookback int)([]*lotusapi.InvocResult, error)
 	StateDecodeParams(id address.Address, p2 abi.MethodNum, p3 []byte) (string, error)
 	StateReplay(ctx context.Context, id string) (*lotusapi.InvocResult, error)
@@ -179,7 +179,7 @@ func (t *Node) MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error) 
 	return pending, err
 }
 
-func (t *Node) SearchState(ctx context.Context, addr address.Address, limit *int, offset *int, height int) ([]model.MessageConfirmed, int, error) {
+func (t *Node) SearchState(ctx context.Context, addr address.Address, limit *int, offset *int, height int) ([]*model.MessageConfirmed, int, error) {
 	ts, _ := t.api.ChainHead(ctx)
 
 	match, _ := t.AddressLookup(addr.String())
@@ -206,7 +206,7 @@ func (t *Node) SearchState(ctx context.Context, addr address.Address, limit *int
 	}
 
 	type SearchStateStruct struct {
-		message *api.Message
+		message *types.Message
 		ts *types.TipSet
 	}
 
@@ -220,7 +220,7 @@ func (t *Node) SearchState(ctx context.Context, addr address.Address, limit *int
 		for _, iter := range msgs {
 			if matchFunc(iter.Message) {
 				// todo create custom struct
-				t1 = append(t1, &SearchStateStruct{message: &iter, ts: ts})
+				t1 = append(t1, &SearchStateStruct{message: iter.Message, ts: ts})
 			}
 		}
 
@@ -249,7 +249,7 @@ func (t *Node) SearchState(ctx context.Context, addr address.Address, limit *int
 	_limit := *limit
 	_offset := *offset
 	_count := len(t1)
-	var res []model.MessageConfirmed
+	var res []*model.MessageConfirmed
 
 	if(_offset > len(t1)){
 		return res, _count, nil
@@ -258,22 +258,22 @@ func (t *Node) SearchState(ctx context.Context, addr address.Address, limit *int
 		_limit = len(t1)-_offset
 	}
 
-	t1 = t1[_offset:_offset+_limit]
+	t2 := t1[_offset:_offset+_limit]
 
-	for _, iter := range t1 {
+	for _, iter := range t2 {
 		var item model.MessageConfirmed
-		item.Cid = iter.message.Cid.String()
+		item.Cid = iter.message.Cid().String()
 		item.Height = int64(iter.ts.Height())
-		item.Value = iter.message.Message.Value.String()
-		item.From = iter.message.Message.From.String()
-		item.To = iter.message.Message.To.String()
-		item.Nonce = iter.message.Message.Nonce
-		item.Version = int(iter.message.Message.Version)
-		item.GasFeeCap = iter.message.Message.GasFeeCap.String()
-		item.GasLimit = iter.message.Message.GasLimit
-		item.GasPremium = iter.message.Message.GasPremium.String()
-		item.Method = uint64(iter.message.Message.Method)
-		obj, err := t.StateDecodeParams(iter.message.Message.To, iter.message.Message.Method, iter.message.Message.Params)
+		item.Value = iter.message.Value.String()
+		item.From = iter.message.From.String()
+		item.To = iter.message.To.String()
+		item.Nonce = iter.message.Nonce
+		item.Version = int(iter.message.Version)
+		item.GasFeeCap = iter.message.GasFeeCap.String()
+		item.GasLimit = iter.message.GasLimit
+		item.GasPremium = iter.message.GasPremium.String()
+		item.Method = uint64(iter.message.Method)
+		obj, err := t.StateDecodeParams(iter.message.To, iter.message.Method, iter.message.Params)
 		if err == nil && obj != "" {
 			item.Params = &obj
 		}
@@ -284,8 +284,7 @@ func (t *Node) SearchState(ctx context.Context, addr address.Address, limit *int
 		// 	item.BaseFeeBurn = replay.GasCost.BaseFeeBurn.String()
 		// 	item.OverEstimationBurn = replay.GasCost.OverEstimationBurn.String()		
 		// }
-
-		res = append(res, item)
+		res = append(res, &item)
 	}
 
 	return res, _count, nil
