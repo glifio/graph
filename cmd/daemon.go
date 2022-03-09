@@ -12,6 +12,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/lru"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/dgraph-io/ristretto"
 	graph "github.com/glifio/graph/gql"
 	"github.com/glifio/graph/gql/generated"
 	util "github.com/glifio/graph/internal/utils"
@@ -34,10 +35,22 @@ var daemonCmd = &cobra.Command{
   Run: func(cmd *cobra.Command, args []string) {
 	config, _ := util.LoadConfig(".")
 
-    fmt.Println("start the graphQL server")
+	log.Println("start the cache")
+	cache, err := ristretto.NewCache(&ristretto.Config{
+		NumCounters: 1e7,     // number of keys to track frequency of (10M).
+		MaxCost:     1 << 30, // maximum cost of cache (1GB).
+		BufferItems: 64,      // number of keys per Get buffer.
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cache.Clear()
+
+    log.Println("start the graphQL server")
 	// Create a new connection to our pg database
 	var db postgres.Database
-	err := db.New(config.DbHost, config.DbPort, config.DbUser, config.DbPassword, config.DbDatabase, config.DbSchema)
+	err = db.New(config.DbHost, config.DbPort, config.DbUser, config.DbPassword, config.DbDatabase, config.DbSchema)
 
 	if err != nil {
 		log.Fatal(err)
@@ -45,6 +58,7 @@ var daemonCmd = &cobra.Command{
 	defer db.Close()
 
 	nodeService := &node.Node{}
+	nodeService.Init(cache)
 	nodeService.Connect(config.LotusAddress, config.LotusToken)
 	defer nodeService.Close()
 
@@ -53,7 +67,7 @@ var daemonCmd = &cobra.Command{
 	messageService := &postgres.Message{}
 	messageService.Init(db)
 	messageConfirmedService := &postgres.MessageConfirmed{}
-	messageConfirmedService.Init(db)
+	messageConfirmedService.Init(db, cache)
 	blockService := &postgres.BlockHeader{}
 	blockService.Init(db)
 

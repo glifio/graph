@@ -14,13 +14,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lily/model/derived"
 	"github.com/filecoin-project/specs-actors/actors/builtin"
 	"github.com/filecoin-project/specs-actors/actors/builtin/multisig"
 	"github.com/glifio/graph/gql/generated"
 	"github.com/glifio/graph/gql/model"
 	util "github.com/glifio/graph/internal/utils"
-	"github.com/glifio/graph/pkg/lily"
 	"github.com/google/uuid"
 	"github.com/jinzhu/copier"
 	"golang.org/x/crypto/blake2b"
@@ -97,26 +97,54 @@ func (r *queryResolver) Message(ctx context.Context, cid string, height *int) (*
 	return &item, err
 }
 
-func (r *queryResolver) Messages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.Message, error) {
-	//return postgres.GetMessages(), nil
-	var items []*model.Message
-	var savedItems []lily.MessageItem
-	savedItems, err := r.MessageService.List(*limit, *offset)
+func (r *queryResolver) Messages(ctx context.Context, p1 string, limit *int, offset *int) ([]*model.MessageConfirmed, error) {
+	var items []*model.MessageConfirmed
+//	var stateMsgs []*model.MessageConfirmed
+
+	maxheight, _ := r.MessageConfirmedService.GetMaxHeight()
+
+	a1, _ := address.NewFromString(p1)
+	addr, err := r.NodeService.AddressLookup(p1)
 	if err != nil {
 		return nil, err
 	}
-	for i, savedItem := range savedItems {
-		var item model.Message
-		savedItem = savedItems[i]
-		item.Cid = savedItem.Cid
-		item.Height = savedItem.Height
-		item.From = savedItem.From
-		item.To = savedItem.To
-		item.Value = strconv.FormatFloat(savedItem.Value, 'f', -1, 64)
-		item.Method = savedItem.Method
-		item.Params = savedItem.Params
+
+	r1, count, err := r.NodeService.SearchState(ctx, a1, limit, offset, maxheight)
+	if err == nil {
+		log.Printf("search state: %d\n", len(r1))
+		for _, iter := range r1 {
+			items = append(items, &iter)
+		}
+	}
+
+	log.Printf("messages: found in state: %d\n", len(r1))
+
+	if len(r1) >= *limit {
+		return items, nil
+	}
+
+	var lily_offset int
+	lily_limit := *limit - len(r1)
+
+	if len(r1) > 0 {
+		// if we found part of the messages in state then offset in lily should be zero
+		lily_offset = 0
+	} else {
+		// if we found no part of the messages in state then offset in lily should be less the count in state
+		lily_offset = *offset - count
+	}
+
+	r2, err := r.MessageConfirmedService.Search(addr, lily_limit, lily_offset)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range r2 {
+		var item model.MessageConfirmed
+		copier.Copy(&item, &r)
 		items = append(items, &item)
 	}
+
+	log.Printf("messages: found in lily: %d\n", len(r2))
 	return items, nil
 }
 
@@ -222,7 +250,7 @@ func (r *queryResolver) MessagesConfirmed(ctx context.Context, address *string, 
 		return nil, err
 	}
 
-	rs, err = r.MessageConfirmedService.Search(addr, limit, offset)
+	rs, err = r.MessageConfirmedService.Search(addr, *limit, *offset)
 	if err != nil {
 		return nil, err
 	}

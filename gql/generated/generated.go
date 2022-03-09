@@ -159,7 +159,7 @@ type ComplexityRoot struct {
 		Block                func(childComplexity int, address string, height int64) int
 		Message              func(childComplexity int, cid string, height *int) int
 		MessageLowConfidence func(childComplexity int, cid string) int
-		Messages             func(childComplexity int, address *string, limit *int, offset *int) int
+		Messages             func(childComplexity int, address string, limit *int, offset *int) int
 		MessagesConfirmed    func(childComplexity int, address *string, limit *int, offset *int) int
 		MsigPending          func(childComplexity int, address *string, limit *int, offset *int) int
 		PendingMessage       func(childComplexity int, cid string) int
@@ -195,7 +195,7 @@ type MessageConfirmedResolver interface {
 type QueryResolver interface {
 	Block(ctx context.Context, address string, height int64) (*model.Block, error)
 	Message(ctx context.Context, cid string, height *int) (*model.MessageConfirmed, error)
-	Messages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.Message, error)
+	Messages(ctx context.Context, address string, limit *int, offset *int) ([]*model.MessageConfirmed, error)
 	PendingMessage(ctx context.Context, cid string) (*model.MessagePending, error)
 	PendingMessages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessagePending, error)
 	MessagesConfirmed(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessageConfirmed, error)
@@ -869,7 +869,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.Messages(childComplexity, args["address"].(*string), args["limit"].(*int), args["offset"].(*int)), true
+		return e.complexity.Query.Messages(childComplexity, args["address"].(string), args["limit"].(*int), args["offset"].(*int)), true
 
 	case "Query.messagesConfirmed":
 		if e.complexity.Query.MessagesConfirmed == nil {
@@ -1062,7 +1062,11 @@ scalar Uint64
 type Query {
   block(address: String!, height: Int64!): Block!
   message(cid: String!, height: Int): MessageConfirmed
-  messages(address: String, limit: Int = 5, offset: Int = 0): [Message!]!
+  messages(
+    address: String!
+    limit: Int = 10
+    offset: Int = 0
+  ): [MessageConfirmed]
   pendingMessage(cid: String!): MessagePending #mempool
   pendingMessages(
     address: String
@@ -1388,10 +1392,10 @@ func (ec *executionContext) field_Query_messagesConfirmed_args(ctx context.Conte
 func (ec *executionContext) field_Query_messages_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 *string
+	var arg0 string
 	if tmp, ok := rawArgs["address"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
-		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -4435,21 +4439,18 @@ func (ec *executionContext) _Query_messages(ctx context.Context, field graphql.C
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Messages(rctx, args["address"].(*string), args["limit"].(*int), args["offset"].(*int))
+		return ec.resolvers.Query().Messages(rctx, args["address"].(string), args["limit"].(*int), args["offset"].(*int))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
 		return graphql.Null
 	}
-	res := resTmp.([]*model.Message)
+	res := resTmp.([]*model.MessageConfirmed)
 	fc.Result = res
-	return ec.marshalNMessage2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageᚄ(ctx, field.Selections, res)
+	return ec.marshalOMessageConfirmed2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageConfirmed(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_pendingMessage(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -6911,9 +6912,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_messages(ctx, field)
-				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
-				}
 				return res
 			})
 		case "pendingMessage":

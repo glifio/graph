@@ -1,8 +1,11 @@
 package postgres
 
 import (
+	"log"
 	"sort"
+	"time"
 
+	"github.com/dgraph-io/ristretto"
 	"github.com/filecoin-project/lily/model/derived"
 	"github.com/glifio/graph/gql/model"
 	"github.com/glifio/graph/pkg/lily"
@@ -11,10 +14,12 @@ import (
 
 type MessageConfirmed struct {
 	db 	Database
+	cache *ristretto.Cache
 }
 
-func (t *MessageConfirmed) Init(db Database) error {
+func (t *MessageConfirmed) Init(db Database, cache *ristretto.Cache) error {
 	t.db = db;
+	t.cache = cache
 
 	// t.db.Db.AddQueryHook(pgdebug.DebugHook{
 	// 	// Print all queries.
@@ -22,6 +27,21 @@ func (t *MessageConfirmed) Init(db Database) error {
 	// })
 
 	return nil
+}
+
+func (t *MessageConfirmed) GetMaxHeight() (int, error) {
+	var res struct {
+		MaxHeight int
+	}
+
+	var msgs []derived.GasOutputs
+	err := t.db.Db.Model(&msgs).ColumnExpr("max(height) AS max_height").Select(&res)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return res.MaxHeight, nil
 }
 
 func (t *MessageConfirmed) Get(id string, height *int) (*lily.GasOutputs, error) {
@@ -82,27 +102,40 @@ func (t *MessageConfirmed) List(address *string, limit *int, offset *int) ([]der
 	return res, nil
 }
 
-func (t *MessageConfirmed) Search(address *model.Address, limit *int, offset *int) ([]derived.GasOutputs, error) {
-	// Select messages
-    var msgs []derived.GasOutputs
-    var err = t.db.Db.Model(&msgs).
-		Where("gas_outputs.from = ?", address.ID).
-		WhereOr("gas_outputs.from = ?", address.Robust).
-		WhereOr("gas_outputs.to = ?", address.ID).
-		WhereOr("gas_outputs.to = ?", address.Robust).
-		Select()
-	if err != nil {
-		return nil, err
+func (t *MessageConfirmed) Search(address *model.Address, limit int, offset int) ([]derived.GasOutputs, error) {
+	var msgs []derived.GasOutputs
+
+	value, found := t.cache.Get("msg:confirm:search:" + address.Robust)
+	if found {
+		log.Println("cache hit")
+		msgs = value.([]derived.GasOutputs)
+	} else {
+		var err = t.db.Db.Model(&msgs).
+			Where("gas_outputs.from = ?", address.ID).
+			WhereOr("gas_outputs.from = ?", address.Robust).
+			WhereOr("gas_outputs.to = ?", address.ID).		
+			WhereOr("gas_outputs.to = ?", address.Robust).
+			Order("height desc").
+			// Limit(limit).
+			// Offset(offset).
+			Select()
+		if err != nil {
+			return nil, err
+		}
+		// set cache
+		t.cache.SetWithTTL("msg:confirm:search:" + address.Robust, msgs, 1, 1*time.Minute)
 	}
 
-	// sort the result by height desc
-	sort.Slice(msgs, func(i, j int) bool {
-		return msgs[i].Height > msgs[j].Height
-	})
+	log.Printf("search lily: height:%d limit:%d offset:%d\n", msgs[0].Height, limit, offset)
+
+	// // sort the result by height desc
+	// sort.Slice(msgs, func(i, j int) bool {
+	// 	return msgs[i].Height > msgs[j].Height
+	// })
 
 	// limit and offset
-	_limit := *limit
-	_offset := *offset
+	_limit := limit
+	_offset := offset
 	var res []derived.GasOutputs
 	if(_offset > len(msgs)){
 		return res, nil
