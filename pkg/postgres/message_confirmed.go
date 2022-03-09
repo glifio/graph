@@ -44,31 +44,36 @@ func (t *MessageConfirmed) GetMaxHeight() (int, error) {
 	return res.MaxHeight, nil
 }
 
-func (t *MessageConfirmed) Get(id string, height *int) (*lily.GasOutputs, error) {
+func (t *MessageConfirmed) Get(id string, height *int) (*lily.GasOutputs, *lily.ParsedMessage, error) {
 	// Select message
     var msgs []lily.GasOutputs
+    var parsed_msgs []lily.ParsedMessage
 	var err error = nil
 
 	if height != nil {
 		err = t.db.Db.Model(&msgs).
-			Relation("ParsedMessage").  // left join parsed msg to get params
 			Where("gas_outputs.cid = ? and gas_outputs.height = ?", id, *height).
 			Select()
 	} else {
 		err = t.db.Db.Model(&msgs).
-			Relation("ParsedMessage").  // left join parsed msg to get params
 			Where("gas_outputs.cid = ?", id).
 			Select()
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if len(msgs) == 0 {
-		return nil, nil 
+		return nil, nil, nil 
 	}
-	
-	return &msgs[0], nil
+
+	err = t.db.Db.Model(&parsed_msgs).
+	Where("parsed_message.cid = ? and parsed_message.height=?", msgs[0].Cid, msgs[0].Height).
+	Select()
+	if err != nil {
+		return &msgs[0], nil, nil
+	}
+	return &msgs[0], &parsed_msgs[0], nil
 }
 
 func (t *MessageConfirmed) List(address *string, limit *int, offset *int) ([]derived.GasOutputs, error) {

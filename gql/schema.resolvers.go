@@ -80,7 +80,7 @@ func (r *queryResolver) Block(ctx context.Context, address string, height int64)
 }
 
 func (r *queryResolver) Message(ctx context.Context, cid string, height *int) (*model.MessageConfirmed, error) {
-	msg, err := r.MessageConfirmedService.Get(cid, height)
+	msg, parsed, err := r.MessageConfirmedService.Get(cid, height)
 	if err != nil {
 		return nil, err
 	}
@@ -91,8 +91,8 @@ func (r *queryResolver) Message(ctx context.Context, cid string, height *int) (*
 
 	var item model.MessageConfirmed
 	copier.Copy(&item, &msg)
-	if msg.ParsedMessage != nil {
-		item.Params = &msg.ParsedMessage.Params
+	if parsed != nil {
+		item.Params = &parsed.Params
 	}
 	return &item, err
 }

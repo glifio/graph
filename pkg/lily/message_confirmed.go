@@ -46,7 +46,7 @@ type ParsedMessage struct {
 }
 
 type MessageConfirmedInterface interface {
-	Get(id string, height *int) (*GasOutputs, error)
+	Get(id string, height *int) (*GasOutputs, *ParsedMessage, error)
 	List(address *string, limit *int, offset *int) ([]derived.GasOutputs, error)
 	Search(address *model.Address, limit int, offset int) ([]derived.GasOutputs, error)
 	GetMaxHeight() (int, error)
