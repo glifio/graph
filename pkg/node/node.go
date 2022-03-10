@@ -85,22 +85,17 @@ func (t *Node) Close(){
 
 func (t *Node) GetActor(id string) (*types.Actor, error) {
 	addr, err := address.NewFromString(id)
+	
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return nil, err
 	}
 	
-	tipset, err := t.api.ChainHead(context.Background())
+	actor, err := t.api.StateGetActor(context.Background(), addr, types.EmptyTSK )
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return nil, err
 	}
-
-	actor, err := t.api.StateGetActor(context.Background(), addr, tipset.Key() )
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("actor cid: ", actor.Code)
-	fmt.Println("actor bal: ", actor.Balance)
 
 	return actor, nil
 }

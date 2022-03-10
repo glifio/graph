@@ -2,7 +2,6 @@ package node
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/filecoin-project/go-address"
@@ -22,39 +21,18 @@ func (t *Actor) Init(api lotusapi.FullNodeStruct) error {
 
 func (t *Actor) Get(id string) (*types.Actor, error) {
 	addr, err := address.NewFromString(id)
+	
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return nil, err
 	}
 	
-	tipset, err := t.api.ChainHead(context.Background())
+	actor, err := t.api.StateGetActor(context.Background(), addr, types.EmptyTSK )
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return nil, err
 	}
 
-	actor, err := t.api.StateGetActor(context.Background(), addr, tipset.Key() )
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("actor cid: ", actor.Code)
-	fmt.Println("actor bal: ", actor.Balance)
-
-	// var actor lily.ActorItem
-	// Make query with our stmt, passing in name argument
-	// err = stmt.QueryRow(id).Scan(&actor.ID,
-	// 	&actor.Code,
-	// 	&actor.Head,
-	// 	&actor.Nonce,
-	// 	&actor.Balance,
-	// 	&actor.StateRoot,
-	// 	&actor.Height)
-	// if err != nil {
-	// 	fmt.Println("GetMessages Query Err: ", err)
-	// }
-
-	// if err != nil {
-	// 	return nil, err
-	// }
 	return actor, nil
 }
 
