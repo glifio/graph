@@ -131,8 +131,6 @@ func (t *MessageConfirmed) Search(address *model.Address, limit int, offset int)
 		t.cache.SetWithTTL("msg:confirm:search:" + address.Robust, msgs, 1, 1*time.Minute)
 	}
 
-	log.Printf("search lily: height:%d limit:%d offset:%d\n", msgs[0].Height, limit, offset)
-
 	// // sort the result by height desc
 	// sort.Slice(msgs, func(i, j int) bool {
 	// 	return msgs[i].Height > msgs[j].Height
@@ -142,12 +140,22 @@ func (t *MessageConfirmed) Search(address *model.Address, limit int, offset int)
 	_limit := limit
 	_offset := offset
 	var res []derived.GasOutputs
+
+	// no results 
+	if len(msgs) == 0 {
+		return res, nil
+	}
+
+	// offset bigger than results
 	if(_offset > len(msgs)){
 		return res, nil
 	}
+
+	// partial results 
 	if(_offset + _limit > len(msgs)){
 		_limit = len(msgs)-_offset
 	}
+
     res = msgs[_offset:_offset+_limit]
 
 	return res, nil
