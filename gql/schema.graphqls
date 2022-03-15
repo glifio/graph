@@ -19,6 +19,7 @@ type Query {
     limit: Int = 5
     offset: Int = 0
   ): [MessagePending!]! #mempool
+  mpoolPending(address: String): [MpoolUpdate!]! #mempool
   messagesConfirmed(
     address: String
     limit: Int = 5
@@ -56,7 +57,7 @@ type ChainHead {
 }
 
 type MpoolUpdate {
-  type: Int
+  type: Int!
   message: MessagePending!
 }
 

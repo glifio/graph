@@ -29,7 +29,7 @@ type NodeInterface interface {
 	StateSearchMsg(id string) (*lotusapi.MsgLookup, error)
 	AddressLookup(id string) (*model.Address, error)
 	MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error)
-	SearchState(ctx context.Context, addr address.Address, limit *int, offset *int, height int) ([]*model.MessageConfirmed, int, error)
+	SearchState(ctx context.Context, addr address.Address, limit *int, offset *int, height int) ([]*SearchStateStruct, int, error)
 	StateListMessages(ctx context.Context, addr string, lookback int)([]*lotusapi.InvocResult, error)
 	StateDecodeParams(id address.Address, p2 abi.MethodNum, p3 []byte) (string, error)
 	StateReplay(ctx context.Context, id string) (*lotusapi.InvocResult, error)
@@ -43,6 +43,11 @@ type Node struct {
 	closer jsonrpc.ClientCloser
 	api v0api.FullNodeStruct
 	cache *ristretto.Cache
+}
+
+type SearchStateStruct struct {
+	Tipset *types.TipSet
+	Message lotusapi.Message
 }
 
 func (t *Node) Init(cache *ristretto.Cache) error {
@@ -174,7 +179,7 @@ func (t *Node) MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error) 
 	return pending, err
 }
 
-func (t *Node) SearchState(ctx context.Context, addr address.Address, limit *int, offset *int, height int) ([]*model.MessageConfirmed, int, error) {
+func (t *Node) SearchState(ctx context.Context, addr address.Address, limit *int, offset *int, height int) ([]*SearchStateStruct, int, error) {
 	ts, _ := t.api.ChainHead(ctx)
 
 	match, _ := t.AddressLookup(addr.String())
@@ -193,16 +198,13 @@ func (t *Node) SearchState(ctx context.Context, addr address.Address, limit *int
 	}
 
 	matchFunc := func(msg *types.Message) bool {		
-		if match.ID == msg.From.String() || match.ID == msg.To.String() || 
-		match.Robust == msg.From.String() || match.Robust == msg.To.String() {
+		if len(match.ID)>1 && (match.ID[1:] == msg.From.String()[1:] || match.ID[1:] == msg.To.String()[1:]) {
+			return true
+		}
+		if len(match.Robust)>1 && (match.Robust[1:] == msg.From.String()[1:] || match.Robust[1:] == msg.To.String()[1:]) {
 			return true
 		}
 		return false
-	}
-
-	type SearchStateStruct struct {
-		ts *types.TipSet
-		msg *lotusapi.Message
 	}
 
 	var t1 []*SearchStateStruct
@@ -214,7 +216,7 @@ func (t *Node) SearchState(ctx context.Context, addr address.Address, limit *int
 
 		for _, iter := range msgs {
 			if matchFunc(iter.Message) {
-				t1 = append(t1, &SearchStateStruct{msg:&iter, ts: ts})
+				t1 = append(t1, &SearchStateStruct{Message: iter, Tipset: ts})
 			}
 		}
 
@@ -243,7 +245,7 @@ func (t *Node) SearchState(ctx context.Context, addr address.Address, limit *int
 	_limit := *limit
 	_offset := *offset
 	_count := len(t1)
-	var res []*model.MessageConfirmed
+	var res []*SearchStateStruct
 
 	if(_offset > len(t1)){
 		return res, _count, nil
@@ -252,35 +254,7 @@ func (t *Node) SearchState(ctx context.Context, addr address.Address, limit *int
 		_limit = len(t1)-_offset
 	}
 
-	t2 := t1[_offset:_offset+_limit]
-
-	for _, iter := range t2 {
-		var item model.MessageConfirmed
-		item.Cid = iter.msg.Cid.String()
-		item.Height = int64(iter.ts.Height())
-		item.Value = iter.msg.Message.Value.String()
-		item.From = iter.msg.Message.From.String()
-		item.To = iter.msg.Message.To.String()
-		item.Nonce = iter.msg.Message.Nonce
-		item.Version = int(iter.msg.Message.Version)
-		item.GasFeeCap = iter.msg.Message.GasFeeCap.String()
-		item.GasLimit = iter.msg.Message.GasLimit
-		item.GasPremium = iter.msg.Message.GasPremium.String()
-		item.Method = uint64(iter.msg.Message.Method)
-		obj, err := t.StateDecodeParams(iter.msg.Message.To, iter.msg.Message.Method, iter.msg.Message.Params)
-		if err == nil && obj != "" {
-			item.Params = &obj
-		}
-
-		// replay, err := t.api.StateReplay(ctx, iter.ts.Key(), iter.message.Cid)
-		// if err == nil {
-		// 	item.MinerTip = replay.GasCost.MinerTip.String()
-		// 	item.BaseFeeBurn = replay.GasCost.BaseFeeBurn.String()
-		// 	item.OverEstimationBurn = replay.GasCost.OverEstimationBurn.String()		
-		// }
-		res = append(res, &item)
-	}
-
+	res = t1[_offset:_offset+_limit]
 	return res, _count, nil
 }
 

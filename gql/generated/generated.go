@@ -161,6 +161,7 @@ type ComplexityRoot struct {
 		MessageLowConfidence func(childComplexity int, cid string) int
 		Messages             func(childComplexity int, address string, limit *int, offset *int) int
 		MessagesConfirmed    func(childComplexity int, address *string, limit *int, offset *int) int
+		MpoolPending         func(childComplexity int, address *string) int
 		MsigPending          func(childComplexity int, address *string, limit *int, offset *int) int
 		PendingMessage       func(childComplexity int, cid string) int
 		PendingMessages      func(childComplexity int, address *string, limit *int, offset *int) int
@@ -198,6 +199,7 @@ type QueryResolver interface {
 	Messages(ctx context.Context, address string, limit *int, offset *int) ([]*model.MessageConfirmed, error)
 	PendingMessage(ctx context.Context, cid string) (*model.MessagePending, error)
 	PendingMessages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessagePending, error)
+	MpoolPending(ctx context.Context, address *string) ([]*model.MpoolUpdate, error)
 	MessagesConfirmed(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessageConfirmed, error)
 	Address(ctx context.Context, str string) (*model.Address, error)
 	Actor(ctx context.Context, address string) (*model.Actor, error)
@@ -883,6 +885,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.MessagesConfirmed(childComplexity, args["address"].(*string), args["limit"].(*int), args["offset"].(*int)), true
 
+	case "Query.mpoolPending":
+		if e.complexity.Query.MpoolPending == nil {
+			break
+		}
+
+		args, err := ec.field_Query_mpoolPending_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.MpoolPending(childComplexity, args["address"].(*string)), true
+
 	case "Query.msigPending":
 		if e.complexity.Query.MsigPending == nil {
 			break
@@ -1073,6 +1087,7 @@ type Query {
     limit: Int = 5
     offset: Int = 0
   ): [MessagePending!]! #mempool
+  mpoolPending(address: String): [MpoolUpdate!]! #mempool
   messagesConfirmed(
     address: String
     limit: Int = 5
@@ -1110,7 +1125,7 @@ type ChainHead {
 }
 
 type MpoolUpdate {
-  type: Int
+  type: Int!
   message: MessagePending!
 }
 
@@ -1419,6 +1434,21 @@ func (ec *executionContext) field_Query_messages_args(ctx context.Context, rawAr
 		}
 	}
 	args["offset"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_mpoolPending_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *string
+	if tmp, ok := rawArgs["address"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
+		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["address"] = arg0
 	return args, nil
 }
 
@@ -4052,11 +4082,14 @@ func (ec *executionContext) _MpoolUpdate_type(ctx context.Context, field graphql
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*int)
+	res := resTmp.(int)
 	fc.Result = res
-	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+	return ec.marshalNInt2int(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MpoolUpdate_message(ctx context.Context, field graphql.CollectedField, obj *model.MpoolUpdate) (ret graphql.Marshaler) {
@@ -4532,6 +4565,48 @@ func (ec *executionContext) _Query_pendingMessages(ctx context.Context, field gr
 	res := resTmp.([]*model.MessagePending)
 	fc.Result = res
 	return ec.marshalNMessagePending2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessagePendingᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_mpoolPending(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_mpoolPending_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().MpoolPending(rctx, args["address"].(*string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*model.MpoolUpdate)
+	fc.Result = res
+	return ec.marshalNMpoolUpdate2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMpoolUpdateᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_messagesConfirmed(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -6796,6 +6871,9 @@ func (ec *executionContext) _MpoolUpdate(ctx context.Context, sel ast.SelectionS
 			out.Values[i] = graphql.MarshalString("MpoolUpdate")
 		case "type":
 			out.Values[i] = ec._MpoolUpdate_type(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		case "message":
 			out.Values[i] = ec._MpoolUpdate_message(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -6934,6 +7012,20 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_pendingMessages(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
+		case "mpoolPending":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_mpoolPending(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&invalids, 1)
 				}
@@ -7711,6 +7803,50 @@ func (ec *executionContext) marshalNMessagePending2ᚖgithubᚗcomᚋglifioᚋgr
 
 func (ec *executionContext) marshalNMpoolUpdate2githubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMpoolUpdate(ctx context.Context, sel ast.SelectionSet, v model.MpoolUpdate) graphql.Marshaler {
 	return ec._MpoolUpdate(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNMpoolUpdate2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMpoolUpdateᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.MpoolUpdate) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNMpoolUpdate2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMpoolUpdate(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalNMpoolUpdate2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMpoolUpdate(ctx context.Context, sel ast.SelectionSet, v *model.MpoolUpdate) graphql.Marshaler {

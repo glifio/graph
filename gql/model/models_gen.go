@@ -55,7 +55,7 @@ type MessagePending struct {
 }
 
 type MpoolUpdate struct {
-	Type    *int            `json:"type"`
+	Type    int             `json:"type"`
 	Message *MessagePending `json:"message"`
 }
 

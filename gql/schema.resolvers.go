@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/filecoin-project/go-address"
+	goaddress "github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lily/model/derived"
 	"github.com/filecoin-project/specs-actors/actors/builtin"
 	"github.com/filecoin-project/specs-actors/actors/builtin/multisig"
@@ -97,25 +97,49 @@ func (r *queryResolver) Message(ctx context.Context, cid string, height *int) (*
 	return &item, err
 }
 
-func (r *queryResolver) Messages(ctx context.Context, p1 string, limit *int, offset *int) ([]*model.MessageConfirmed, error) {
+func (r *queryResolver) Messages(ctx context.Context, address string, limit *int, offset *int) ([]*model.MessageConfirmed, error) {
 	var items []*model.MessageConfirmed
-//	var stateMsgs []*model.MessageConfirmed
+	//	var stateMsgs []*model.MessageConfirmed
 
 	maxheight, _ := r.MessageConfirmedService.GetMaxHeight()
 
-	a1, _ := address.NewFromString(p1)
-	addr, err := r.NodeService.AddressLookup(p1)
+	a1, _ := goaddress.NewFromString(address)
+	addr, err := r.NodeService.AddressLookup(address)
 	if err != nil {
 		return nil, err
 	}
 
 	r1, count, err := r.NodeService.SearchState(ctx, a1, limit, offset, maxheight)
 	if err == nil {
-		items = r1
+		for _, iter := range r1 {
+			var item model.MessageConfirmed
+			item.Cid = iter.Message.Cid.String()
+			item.Height = int64(iter.Tipset.Height())
+			item.Value = iter.Message.Message.Value.String()
+			item.From = iter.Message.Message.From.String()
+			item.To = iter.Message.Message.To.String()
+			item.Nonce = iter.Message.Message.Nonce
+			item.Version = int(iter.Message.Message.Version)
+			item.GasFeeCap = iter.Message.Message.GasFeeCap.String()
+			item.GasLimit = iter.Message.Message.GasLimit
+			item.GasPremium = iter.Message.Message.GasPremium.String()
+			item.Method = uint64(iter.Message.Message.Method)
+			obj, err := r.NodeService.StateDecodeParams(iter.Message.Message.To, iter.Message.Message.Method, iter.Message.Message.Params)
+			if err == nil && obj != "" {
+				item.Params = &obj
+			}
+
+			// replay, err := t.api.StateReplay(ctx, iter.ts.Key(), iter.message.Cid)
+			// if err == nil {
+			// 	item.MinerTip = replay.GasCost.MinerTip.String()
+			// 	item.BaseFeeBurn = replay.GasCost.BaseFeeBurn.String()
+			// 	item.OverEstimationBurn = replay.GasCost.OverEstimationBurn.String()		
+			// }
+			items = append(items, &item)
+		}
 	}
 
 	log.Printf("messages: found in state: %d\n", len(r1))
-
 
 	if len(r1) >= *limit {
 		return items, nil
@@ -237,6 +261,11 @@ func (r *queryResolver) PendingMessages(ctx context.Context, address *string, li
 		}
 	}
 	return items, nil
+}
+
+func (r *queryResolver) MpoolPending(ctx context.Context, address *string) ([]*model.MpoolUpdate, error) {
+	var pool []*model.MpoolUpdate
+	return pool, nil
 }
 
 func (r *queryResolver) MessagesConfirmed(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessageConfirmed, error) {
@@ -412,38 +441,36 @@ func (r *queryResolver) MessageLowConfidence(ctx context.Context, cid string) (*
 		return nil, fmt.Errorf("not found")
 	}
 
-	iter, err := r.NodeService.StateReplay(ctx, cid)
-	if err != nil {
-		return nil, err
-	}
-
 	item.Height = int64(statemsg.Height)
+	item.Cid = statemsg.Message.String()
 
-	item.Cid = iter.MsgCid.String()
-	item.Version = int(iter.Msg.Version)
-	item.From = iter.Msg.From.String()
-	item.To = iter.Msg.To.String()
-	item.Nonce = iter.Msg.Nonce
-	item.Value = iter.Msg.Value.String()
-	item.GasLimit = iter.Msg.GasLimit
-	gasfeecap := iter.Msg.GasFeeCap.String()
-	item.GasFeeCap = gasfeecap
-	gaspremium := iter.Msg.GasPremium.String()
-	item.GasPremium = gaspremium
-	item.Method = uint64(iter.Msg.Method)
-	item.GasUsed = iter.GasCost.GasUsed.Int64()
-	_, item.GasBurned = util.ComputeGasOverestimationBurn(iter.GasCost.GasUsed.Int64(), iter.Msg.GasLimit)
-	item.MinerTip = iter.GasCost.MinerTip.String()
-	item.BaseFeeBurn = iter.GasCost.BaseFeeBurn.String()
-	item.OverEstimationBurn = iter.GasCost.OverEstimationBurn.String()
-	item.Refund = iter.GasCost.Refund.String()
-	item.MinerPenalty = iter.GasCost.MinerPenalty.String()
-	item.MinerTip = iter.GasCost.MinerTip.String()
-
-	obj, err := r.NodeService.StateDecodeParams(iter.Msg.To, iter.Msg.Method, iter.Msg.Params)
-
-	if err == nil && obj != "" {
-		item.Params = &obj
+	iter, err := r.NodeService.StateReplay(ctx, cid)
+	if err == nil {
+		item.Version =  int(iter.Msg.Version)
+		item.From =  iter.Msg.From.String()
+		item.To = iter.Msg.To.String()
+		item.Nonce = iter.Msg.Nonce
+		item.Value = iter.Msg.Value.String()
+		item.GasLimit = iter.Msg.GasLimit
+		gasfeecap := iter.Msg.GasFeeCap.String()
+		item.GasFeeCap = gasfeecap
+		gaspremium := iter.Msg.GasPremium.String()
+		item.GasPremium = gaspremium
+		item.Method = uint64(iter.Msg.Method)
+		item.GasUsed = iter.GasCost.GasUsed.Int64()
+		_, item.GasBurned = util.ComputeGasOverestimationBurn(iter.GasCost.GasUsed.Int64(), iter.Msg.GasLimit)
+		item.MinerTip = iter.GasCost.MinerTip.String()
+		item.BaseFeeBurn = iter.GasCost.BaseFeeBurn.String()
+		item.OverEstimationBurn = iter.GasCost.OverEstimationBurn.String()
+		item.Refund = iter.GasCost.Refund.String()
+		item.MinerPenalty = iter.GasCost.MinerPenalty.String()
+		item.MinerTip = iter.GasCost.MinerTip.String()
+	
+		obj, err := r.NodeService.StateDecodeParams(iter.Msg.To, iter.Msg.Method, iter.Msg.Params)
+	
+		if err == nil && obj != "" {
+			item.Params = &obj
+		}
 	}
 
 	return &item, nil
@@ -554,7 +581,7 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 				for msg := range r.MpoolObserver.channel {
 					var res model.MpoolUpdate
 
-					res.Type = (*int)(&msg.Type)
+					res.Type = int(msg.Type)
 					res.Message = &model.MessagePending{}
 					res.Message.Cid = msg.Message.Cid().String()
 					res.Message.Version = strconv.FormatUint(msg.Message.Message.Version, 10)
