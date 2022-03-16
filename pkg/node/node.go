@@ -29,7 +29,7 @@ type NodeInterface interface {
 	StateSearchMsg(id string) (*lotusapi.MsgLookup, error)
 	AddressLookup(id string) (*model.Address, error)
 	MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error)
-	SearchState(ctx context.Context, addr address.Address, limit *int, offset *int, height int) ([]*SearchStateStruct, int, error)
+	SearchState(ctx context.Context, match Match, limit *int, offset *int, height int) ([]*SearchStateStruct, int, error)
 	StateListMessages(ctx context.Context, addr string, lookback int)([]*lotusapi.InvocResult, error)
 	StateDecodeParams(id address.Address, p2 abi.MethodNum, p3 []byte) (string, error)
 	StateReplay(ctx context.Context, id string) (*lotusapi.InvocResult, error)
@@ -179,33 +179,12 @@ func (t *Node) MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error) 
 	return pending, err
 }
 
-func (t *Node) SearchState(ctx context.Context, addr address.Address, limit *int, offset *int, height int) ([]*SearchStateStruct, int, error) {
+// match types take an *types.Message and return a bool value.
+type Match func(*types.Message) bool
+
+
+func (t *Node) SearchState(ctx context.Context, match Match, limit *int, offset *int, height int) ([]*SearchStateStruct, int, error) {
 	ts, _ := t.api.ChainHead(ctx)
-
-	match, _ := t.AddressLookup(addr.String())
-
-	if match != nil {
-		_, err := t.api.StateLookupID(ctx, addr, types.EmptyTSK)
-
-		// if the recipient doesn't exist at the start point, we're not gonna find any matches
-		if xerrors.Is(err, types.ErrActorNotFound) {
-			return nil, 0, nil
-		}
-
-		if err != nil {
-			return nil, 0, xerrors.Errorf("looking up match: %w", err)
-		}
-	}
-
-	matchFunc := func(msg *types.Message) bool {		
-		if len(match.ID)>1 && (match.ID[1:] == msg.From.String()[1:] || match.ID[1:] == msg.To.String()[1:]) {
-			return true
-		}
-		if len(match.Robust)>1 && (match.Robust[1:] == msg.From.String()[1:] || match.Robust[1:] == msg.To.String()[1:]) {
-			return true
-		}
-		return false
-	}
 
 	var t1 []*SearchStateStruct
 	for i := 0; i < viper.GetInt("confidence"); i++ {
@@ -215,7 +194,7 @@ func (t *Node) SearchState(ctx context.Context, addr address.Address, limit *int
 		}
 
 		for _, iter := range msgs {
-			if matchFunc(iter.Message) {
+			if match(iter.Message) {
 				t1 = append(t1, &SearchStateStruct{Message: iter, Tipset: ts})
 			}
 		}

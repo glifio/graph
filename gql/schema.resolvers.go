@@ -14,14 +14,15 @@ import (
 	"strings"
 	"time"
 
-	goaddress "github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lily/model/derived"
+	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/specs-actors/actors/builtin"
 	"github.com/filecoin-project/specs-actors/actors/builtin/multisig"
 	"github.com/glifio/graph/gql/generated"
 	"github.com/glifio/graph/gql/model"
 	util "github.com/glifio/graph/internal/utils"
 	"github.com/google/uuid"
+	"github.com/ipfs/go-cid"
 	"github.com/jinzhu/copier"
 	"golang.org/x/crypto/blake2b"
 )
@@ -79,8 +80,56 @@ func (r *queryResolver) Block(ctx context.Context, address string, height int64)
 	return &item, err
 }
 
-func (r *queryResolver) Message(ctx context.Context, cid string, height *int) (*model.MessageConfirmed, error) {
-	msg, parsed, err := r.MessageConfirmedService.Get(cid, height)
+func (r *queryResolver) Message(ctx context.Context, p1 string, height *int) (*model.MessageConfirmed, error) {
+	limit := 1
+	offset := 0
+
+	msgCID, _ := cid.Decode(p1)
+	maxheight, _ := r.MessageConfirmedService.GetMaxHeight()
+
+	// Look in State
+	matchFunc := func(msg *types.Message) bool {		
+		return msg.Cid().Equals(msgCID)
+	}
+
+	r1, count, err := r.NodeService.SearchState(ctx, matchFunc, &limit, &offset, maxheight)
+
+	if err == nil && count == 1 {
+		iter := r1[0]
+		var item model.MessageConfirmed
+		item.Cid = iter.Message.Cid.String()
+		item.Height = int64(iter.Tipset.Height())
+		item.Value = iter.Message.Message.Value.String()
+		item.From = iter.Message.Message.From.String()
+		item.To = iter.Message.Message.To.String()
+		item.Nonce = iter.Message.Message.Nonce
+		item.Version = int(iter.Message.Message.Version)
+		item.GasFeeCap = iter.Message.Message.GasFeeCap.String()
+		item.GasLimit = iter.Message.Message.GasLimit
+		item.GasPremium = iter.Message.Message.GasPremium.String()
+		item.Method = uint64(iter.Message.Message.Method)
+		obj, err := r.NodeService.StateDecodeParams(iter.Message.Message.To, iter.Message.Message.Method, iter.Message.Message.Params)
+		if err == nil && obj != "" {
+			item.Params = &obj
+		}
+
+		replay, err := r.NodeService.StateReplay(ctx, iter.Message.Cid.String())
+		if err == nil {
+			item.MinerTip = replay.GasCost.MinerTip.String()
+			item.BaseFeeBurn = replay.GasCost.BaseFeeBurn.String()
+			item.OverEstimationBurn = replay.GasCost.OverEstimationBurn.String()		
+		}
+		log.Printf("message: found in state: %d\n", item.Nonce)
+		return &item, nil
+	}
+
+	// only look in state
+	if(*height == -1){
+		return nil, nil
+	}
+
+	// Look in Lily
+	msg, parsed, err := r.MessageConfirmedService.Get(p1, height)
 	if err != nil {
 		return nil, err
 	}
@@ -94,6 +143,7 @@ func (r *queryResolver) Message(ctx context.Context, cid string, height *int) (*
 	if parsed != nil {
 		item.Params = &parsed.Params
 	}
+	log.Printf("message: found in lily: %d\n", item.Nonce)
 	return &item, err
 }
 
@@ -103,13 +153,22 @@ func (r *queryResolver) Messages(ctx context.Context, address string, limit *int
 
 	maxheight, _ := r.MessageConfirmedService.GetMaxHeight()
 
-	a1, _ := goaddress.NewFromString(address)
 	addr, err := r.NodeService.AddressLookup(address)
 	if err != nil {
 		return nil, err
 	}
+	
+	matchFunc := func(msg *types.Message) bool {		
+		if len(addr.ID)>1 && (addr.ID[1:] == msg.From.String()[1:] || addr.ID[1:] == msg.To.String()[1:]) {
+			return true
+		}
+		if len(addr.Robust)>1 && (addr.Robust[1:] == msg.From.String()[1:] || addr.Robust[1:] == msg.To.String()[1:]) {
+			return true
+		}
+		return false
+	}
 
-	r1, count, err := r.NodeService.SearchState(ctx, a1, limit, offset, maxheight)
+	r1, count, err := r.NodeService.SearchState(ctx, matchFunc, limit, offset, maxheight)
 	if err == nil {
 		for _, iter := range r1 {
 			var item model.MessageConfirmed
