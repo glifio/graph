@@ -124,7 +124,7 @@ func (r *queryResolver) Message(ctx context.Context, p1 string, height *int) (*m
 	}
 
 	// only look in state
-	if(*height == -1){
+	if(height != nil && *height == -1){
 		return nil, nil
 	}
 
