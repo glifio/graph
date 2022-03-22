@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/filecoin-project/lily/model/derived"
-	"github.com/filecoin-project/lotus/chain/types"
+	lotusapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/specs-actors/actors/builtin"
 	"github.com/filecoin-project/specs-actors/actors/builtin/multisig"
 	"github.com/glifio/graph/gql/generated"
@@ -88,38 +88,16 @@ func (r *queryResolver) Message(ctx context.Context, p1 string, height *int) (*m
 	maxheight, _ := r.MessageConfirmedService.GetMaxHeight()
 
 	// Look in State
-	matchFunc := func(msg *types.Message) bool {		
-		return msg.Cid().Equals(msgCID)
+	matchFunc := func(msg *lotusapi.InvocResult) bool {		
+		// match on both signed and unsigned cid
+		return msgCID.Equals(msg.MsgCid) || msgCID.Equals(msg.Msg.Cid())
 	}
 
 	r1, count, err := r.NodeService.SearchState(ctx, matchFunc, &limit, &offset, maxheight)
 
 	if err == nil && count == 1 {
-		iter := r1[0]
-		var item model.MessageConfirmed
-		item.Cid = iter.Message.Cid.String()
-		item.Height = int64(iter.Tipset.Height())
-		item.Value = iter.Message.Message.Value.String()
-		item.From = iter.Message.Message.From.String()
-		item.To = iter.Message.Message.To.String()
-		item.Nonce = iter.Message.Message.Nonce
-		item.Version = int(iter.Message.Message.Version)
-		item.GasFeeCap = iter.Message.Message.GasFeeCap.String()
-		item.GasLimit = iter.Message.Message.GasLimit
-		item.GasPremium = iter.Message.Message.GasPremium.String()
-		item.Method = uint64(iter.Message.Message.Method)
-		obj, err := r.NodeService.StateDecodeParams(iter.Message.Message.To, iter.Message.Message.Method, iter.Message.Message.Params)
-		if err == nil && obj != "" {
-			item.Params = &obj
-		}
-
-		replay, err := r.NodeService.StateReplay(ctx, iter.Message.Cid.String())
-		if err == nil {
-			item.MinerTip = replay.GasCost.MinerTip.String()
-			item.BaseFeeBurn = replay.GasCost.BaseFeeBurn.String()
-			item.OverEstimationBurn = replay.GasCost.OverEstimationBurn.String()		
-		}
-		log.Printf("message: found in state: %d\n", item.Nonce)
+		item := r1[0].ConfirmedMessage(r.NodeService.Node())
+		log.Printf("message: found in state: %s\n", item.Cid)
 		return &item, nil
 	}
 
@@ -149,7 +127,6 @@ func (r *queryResolver) Message(ctx context.Context, p1 string, height *int) (*m
 
 func (r *queryResolver) Messages(ctx context.Context, address string, limit *int, offset *int) ([]*model.MessageConfirmed, error) {
 	var items []*model.MessageConfirmed
-	//	var stateMsgs []*model.MessageConfirmed
 
 	maxheight, _ := r.MessageConfirmedService.GetMaxHeight()
 
@@ -158,11 +135,11 @@ func (r *queryResolver) Messages(ctx context.Context, address string, limit *int
 		return nil, err
 	}
 	
-	matchFunc := func(msg *types.Message) bool {		
-		if len(addr.ID)>1 && (addr.ID[1:] == msg.From.String()[1:] || addr.ID[1:] == msg.To.String()[1:]) {
+	matchFunc := func(msg *lotusapi.InvocResult) bool {		
+		if len(addr.ID)>1 && (addr.ID[1:] == msg.Msg.From.String()[1:] || addr.ID[1:] == msg.Msg.To.String()[1:]) {
 			return true
 		}
-		if len(addr.Robust)>1 && (addr.Robust[1:] == msg.From.String()[1:] || addr.Robust[1:] == msg.To.String()[1:]) {
+		if len(addr.Robust)>1 && (addr.Robust[1:] == msg.Msg.From.String()[1:] || addr.Robust[1:] == msg.Msg.To.String()[1:]) {
 			return true
 		}
 		return false
@@ -171,29 +148,7 @@ func (r *queryResolver) Messages(ctx context.Context, address string, limit *int
 	r1, count, err := r.NodeService.SearchState(ctx, matchFunc, limit, offset, maxheight)
 	if err == nil {
 		for _, iter := range r1 {
-			var item model.MessageConfirmed
-			item.Cid = iter.Message.Cid.String()
-			item.Height = int64(iter.Tipset.Height())
-			item.Value = iter.Message.Message.Value.String()
-			item.From = iter.Message.Message.From.String()
-			item.To = iter.Message.Message.To.String()
-			item.Nonce = iter.Message.Message.Nonce
-			item.Version = int(iter.Message.Message.Version)
-			item.GasFeeCap = iter.Message.Message.GasFeeCap.String()
-			item.GasLimit = iter.Message.Message.GasLimit
-			item.GasPremium = iter.Message.Message.GasPremium.String()
-			item.Method = uint64(iter.Message.Message.Method)
-			obj, err := r.NodeService.StateDecodeParams(iter.Message.Message.To, iter.Message.Message.Method, iter.Message.Message.Params)
-			if err == nil && obj != "" {
-				item.Params = &obj
-			}
-
-			// replay, err := t.api.StateReplay(ctx, iter.ts.Key(), iter.message.Cid)
-			// if err == nil {
-			// 	item.MinerTip = replay.GasCost.MinerTip.String()
-			// 	item.BaseFeeBurn = replay.GasCost.BaseFeeBurn.String()
-			// 	item.OverEstimationBurn = replay.GasCost.OverEstimationBurn.String()		
-			// }
+			item := iter.ConfirmedMessage(r.NodeService.Node())
 			items = append(items, &item)
 		}
 	}
@@ -503,7 +458,7 @@ func (r *queryResolver) MessageLowConfidence(ctx context.Context, cid string) (*
 	item.Height = int64(statemsg.Height)
 	item.Cid = statemsg.Message.String()
 
-	iter, err := r.NodeService.StateReplay(ctx, cid)
+	iter, err := r.NodeService.StateReplay(ctx, statemsg.TipSet, statemsg.Message)
 	if err == nil {
 		item.Version =  int(iter.Msg.Version)
 		item.From =  iter.Msg.From.String()

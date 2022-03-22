@@ -32,10 +32,11 @@ type NodeInterface interface {
 	SearchState(ctx context.Context, match Match, limit *int, offset *int, height int) ([]*SearchStateStruct, int, error)
 	StateListMessages(ctx context.Context, addr string, lookback int)([]*lotusapi.InvocResult, error)
 	StateDecodeParams(id address.Address, p2 abi.MethodNum, p3 []byte) (string, error)
-	StateReplay(ctx context.Context, id string) (*lotusapi.InvocResult, error)
+	StateReplay(ctx context.Context, p1 types.TipSetKey, p2 cid.Cid) (*lotusapi.InvocResult, error)
 
 	ChainHeadSub(ctx context.Context) (<-chan []*lotusapi.HeadChange, error)
 	MpoolSub(ctx context.Context) (<-chan lotusapi.MpoolUpdate, error)
+	Node() *Node
 }
 
 type Node struct {
@@ -47,12 +48,49 @@ type Node struct {
 
 type SearchStateStruct struct {
 	Tipset *types.TipSet
-	Message lotusapi.Message
+	Message lotusapi.InvocResult
+}
+
+func (state *SearchStateStruct) ConfirmedMessage(t *Node) model.MessageConfirmed {
+	var item model.MessageConfirmed
+
+	item.Cid = state.Message.MsgCid.String()
+	item.Height = int64(state.Tipset.Height())
+	item.Version = int(state.Message.Msg.Version)
+	item.From =  state.Message.Msg.From.String()
+	item.To = state.Message.Msg.To.String()
+	item.Nonce = state.Message.Msg.Nonce
+	item.Value = state.Message.Msg.Value.String()
+	item.GasLimit = state.Message.Msg.GasLimit
+	item.GasFeeCap = state.Message.Msg.GasFeeCap.String()
+	item.GasPremium = state.Message.Msg.GasPremium.String()
+	item.Method = uint64(state.Message.Msg.Method)
+	item.GasUsed = state.Message.GasCost.GasUsed.Int64()
+	item.GasBurned = state.Message.GasCost.OverEstimationBurn.Int64()
+	item.MinerTip = state.Message.GasCost.MinerTip.String()
+	item.BaseFeeBurn = state.Message.GasCost.BaseFeeBurn.String()
+	item.OverEstimationBurn = state.Message.GasCost.OverEstimationBurn.String()
+	item.Refund = state.Message.GasCost.Refund.String()
+	item.MinerPenalty = state.Message.GasCost.MinerPenalty.String()
+	item.MinerTip = state.Message.GasCost.MinerTip.String()
+
+	//todo add tipsetkey
+	params, err := t.StateDecodeParams(state.Message.Msg.To, state.Message.Msg.Method, state.Message.Msg.Params)
+
+	if err == nil && params != "" {
+		item.Params = &params
+	}
+
+	return item
 }
 
 func (t *Node) Init(cache *ristretto.Cache) error {
 	t.cache = cache;
 	return nil
+}
+
+func (t *Node) Node() *Node {
+	return t
 }
 
 func (t *Node) Connect(address1 string, token string){
@@ -180,7 +218,7 @@ func (t *Node) MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error) 
 }
 
 // match types take an *types.Message and return a bool value.
-type Match func(*types.Message) bool
+type Match func(*lotusapi.InvocResult) bool
 
 
 func (t *Node) SearchState(ctx context.Context, match Match, limit *int, offset *int, height int) ([]*SearchStateStruct, int, error) {
@@ -194,8 +232,9 @@ func (t *Node) SearchState(ctx context.Context, match Match, limit *int, offset 
 		}
 
 		for _, iter := range msgs {
-			if match(iter.Message) {
-				t1 = append(t1, &SearchStateStruct{Message: iter, Tipset: ts})
+			if match(iter) {
+				log.Printf("search state match")
+				t1 = append(t1, &SearchStateStruct{Message: *iter, Tipset: ts})
 			}
 		}
 
@@ -237,13 +276,13 @@ func (t *Node) SearchState(ctx context.Context, match Match, limit *int, offset 
 	return res, _count, nil
 }
 
-func (t *Node) ChainGetMessagesInTipset(p0 context.Context, p1 types.TipSetKey) ([]lotusapi.Message, error) {
+func (t *Node) ChainGetMessagesInTipset(p0 context.Context, p1 types.TipSetKey) ([]*lotusapi.InvocResult, error) {
 	var key = "node/chain/messages/tipset/" + p1.String()
 
 	// look in cache
 	value, found := t.cache.Get(key)
 	if found {
-		res := value.([]lotusapi.Message)
+		res := value.([]*lotusapi.InvocResult)
 		return res, nil
 	}
 
@@ -252,11 +291,22 @@ func (t *Node) ChainGetMessagesInTipset(p0 context.Context, p1 types.TipSetKey) 
 	if err != nil {
 		return nil, err
 	}
+	
+	var tmsg []*types.Message
+	for _, iter := range msgs {
+		tmsg = append(tmsg, iter.Message)
+	}
+
+	res, err := t.api.StateCompute(p0, api.LookbackNoLimit, tmsg, p1)
+
+	if err != nil {
+		return nil, err
+	}
 
 	// add to cache
-	t.cache.SetWithTTL(key, msgs, 1, 30*time.Minute)
+	t.cache.SetWithTTL(key, res.Trace, 1, 30*time.Minute)
 
-	return msgs, err
+	return res.Trace, err
 }
 
 func (t *Node) ChainGetTipSet(p0 context.Context, p1 types.TipSetKey) (*types.TipSet, error){
@@ -320,7 +370,7 @@ func (t *Node) StateListMessages(ctx context.Context, addr string, lookback int)
 
 	var invoc []*lotusapi.InvocResult
 	for _, iter := range out {
-		replay, err := t.StateReplay(ctx, iter.String())
+		replay, err := t.StateReplay(ctx, types.EmptyTSK, iter)
 		if err != nil {
 			log.Printf("StateListMessages: %s\n", err)
 		} else {
@@ -331,22 +381,17 @@ func (t *Node) StateListMessages(ctx context.Context, addr string, lookback int)
 	return invoc, err 
 }
 
-func (t *Node) StateReplay(ctx context.Context, id string) (*lotusapi.InvocResult, error) {
-	var key = "node/state/replay/" + id
+func (t *Node) StateReplay(ctx context.Context, p1 types.TipSetKey, p2 cid.Cid) (*lotusapi.InvocResult, error) {
+	var key = "node/state/replay/" + p2.String()
 
 	value, found := t.cache.Get(key)
 	if found {
-		log.Println(key)
+		log.Printf("hit -> state replay cache: %s\n", key)
 		res := value.(lotusapi.InvocResult)
 		return &res, nil
 	}
 
-	c, err := cid.Decode(id)
-	if err != nil {
-		return nil, err
-	}
-
-	res, err := t.api.StateReplay(ctx, types.EmptyTSK, c)
+	res, err := t.api.StateReplay(ctx, p1, p2)
 	if err != nil {
 		return nil, err
 	}

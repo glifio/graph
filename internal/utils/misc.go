@@ -1,6 +1,8 @@
 package util
 
-import "github.com/filecoin-project/go-state-types/big"
+import (
+	"github.com/filecoin-project/go-state-types/big"
+)
 
 func Min(a, b int) int {
 	if a < b {
