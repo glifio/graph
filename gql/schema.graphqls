@@ -9,7 +9,7 @@ type Query {
   block(address: String!, height: Int64!): Block!
   message(cid: String!, height: Int): MessageConfirmed
   messages(
-    address: String!
+    address: String
     limit: Int = 10
     offset: Int = 0
   ): [MessageConfirmed]

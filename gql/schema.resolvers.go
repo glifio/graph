@@ -80,15 +80,15 @@ func (r *queryResolver) Block(ctx context.Context, address string, height int64)
 	return &item, err
 }
 
-func (r *queryResolver) Message(ctx context.Context, p1 string, height *int) (*model.MessageConfirmed, error) {
+func (r *queryResolver) Message(ctx context.Context, _cid string, height *int) (*model.MessageConfirmed, error) {
 	limit := 1
 	offset := 0
 
-	msgCID, _ := cid.Decode(p1)
+	msgCID, _ := cid.Decode(_cid)
 	maxheight, _ := r.MessageConfirmedService.GetMaxHeight()
 
 	// Look in State
-	matchFunc := func(msg *lotusapi.InvocResult) bool {		
+	matchFunc := func(msg *lotusapi.InvocResult) bool {
 		// match on both signed and unsigned cid
 		return msgCID.Equals(msg.MsgCid) || msgCID.Equals(msg.Msg.Cid())
 	}
@@ -102,12 +102,12 @@ func (r *queryResolver) Message(ctx context.Context, p1 string, height *int) (*m
 	}
 
 	// only look in state
-	if(height != nil && *height == -1){
+	if height != nil && *height == -1 {
 		return nil, nil
 	}
 
 	// Look in Lily
-	msg, parsed, err := r.MessageConfirmedService.Get(p1, height)
+	msg, parsed, err := r.MessageConfirmedService.Get(_cid, height)
 	if err != nil {
 		return nil, err
 	}
@@ -125,24 +125,35 @@ func (r *queryResolver) Message(ctx context.Context, p1 string, height *int) (*m
 	return &item, err
 }
 
-func (r *queryResolver) Messages(ctx context.Context, address string, limit *int, offset *int) ([]*model.MessageConfirmed, error) {
+func (r *queryResolver) Messages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessageConfirmed, error) {
 	var items []*model.MessageConfirmed
 
 	maxheight, _ := r.MessageConfirmedService.GetMaxHeight()
 
-	addr, err := r.NodeService.AddressLookup(address)
-	if err != nil {
-		return nil, err
-	}
-	
-	matchFunc := func(msg *lotusapi.InvocResult) bool {		
-		if len(addr.ID)>1 && (addr.ID[1:] == msg.Msg.From.String()[1:] || addr.ID[1:] == msg.Msg.To.String()[1:]) {
+	var matchFunc func(msg *lotusapi.InvocResult) bool
+	var addr *model.Address
+	var err error
+
+	if address == nil {
+		matchFunc = func(msg *lotusapi.InvocResult) bool {
 			return true
 		}
-		if len(addr.Robust)>1 && (addr.Robust[1:] == msg.Msg.From.String()[1:] || addr.Robust[1:] == msg.Msg.To.String()[1:]) {
-			return true
+	} else {
+		addr, err = r.NodeService.AddressLookup(*address)
+		if err != nil {
+			log.Printf("messages: address not found: %s\n", *address)
+			return nil, err
 		}
-		return false
+
+		matchFunc = func(msg *lotusapi.InvocResult) bool {
+			if len(addr.ID) > 1 && (addr.ID[1:] == msg.Msg.From.String()[1:] || addr.ID[1:] == msg.Msg.To.String()[1:]) {
+				return true
+			}
+			if len(addr.Robust) > 1 && (addr.Robust[1:] == msg.Msg.From.String()[1:] || addr.Robust[1:] == msg.Msg.To.String()[1:]) {
+				return true
+			}
+			return false
+		}
 	}
 
 	r1, count, err := r.NodeService.SearchState(ctx, matchFunc, limit, offset, maxheight)
@@ -161,6 +172,11 @@ func (r *queryResolver) Messages(ctx context.Context, address string, limit *int
 
 	var lily_offset int
 	lily_limit := *limit - len(r1)
+
+	// only search state without address
+	if addr == nil {
+		return items, nil
+	}
 
 	if len(r1) > 0 {
 		// if we found part of the messages in state then offset in lily should be zero
@@ -460,8 +476,8 @@ func (r *queryResolver) MessageLowConfidence(ctx context.Context, cid string) (*
 
 	iter, err := r.NodeService.StateReplay(ctx, statemsg.TipSet, statemsg.Message)
 	if err == nil {
-		item.Version =  int(iter.Msg.Version)
-		item.From =  iter.Msg.From.String()
+		item.Version = int(iter.Msg.Version)
+		item.From = iter.Msg.From.String()
 		item.To = iter.Msg.To.String()
 		item.Nonce = iter.Msg.Nonce
 		item.Value = iter.Msg.Value.String()
@@ -479,9 +495,9 @@ func (r *queryResolver) MessageLowConfidence(ctx context.Context, cid string) (*
 		item.Refund = iter.GasCost.Refund.String()
 		item.MinerPenalty = iter.GasCost.MinerPenalty.String()
 		item.MinerTip = iter.GasCost.MinerTip.String()
-	
+
 		obj, err := r.NodeService.StateDecodeParams(iter.Msg.To, iter.Msg.Method, iter.Msg.Params)
-	
+
 		if err == nil && obj != "" {
 			item.Params = &obj
 		}

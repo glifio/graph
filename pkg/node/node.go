@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/go-state-types/abi"
+	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/lotus/api"
 	lotusapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v0api"
@@ -54,17 +55,20 @@ type SearchStateStruct struct {
 func (state *SearchStateStruct) ConfirmedMessage(t *Node) model.MessageConfirmed {
 	var item model.MessageConfirmed
 
-	item.Cid = state.Message.MsgCid.String()
-	item.Height = int64(state.Tipset.Height())
-	item.Version = int(state.Message.Msg.Version)
-	item.From =  state.Message.Msg.From.String()
-	item.To = state.Message.Msg.To.String()
-	item.Nonce = state.Message.Msg.Nonce
-	item.Value = state.Message.Msg.Value.String()
-	item.GasLimit = state.Message.Msg.GasLimit
-	item.GasFeeCap = state.Message.Msg.GasFeeCap.String()
-	item.GasPremium = state.Message.Msg.GasPremium.String()
-	item.Method = uint64(state.Message.Msg.Method)
+	if state.Message.Msg != nil {
+		item.Cid = state.Message.MsgCid.String()
+		item.Height = int64(state.Tipset.Height())
+		item.Version = int(state.Message.Msg.Version)
+		item.From =  state.Message.Msg.From.String()
+		item.To = state.Message.Msg.To.String()
+		item.Nonce = state.Message.Msg.Nonce
+		item.Value = state.Message.Msg.Value.String()
+		item.GasLimit = state.Message.Msg.GasLimit
+		item.GasFeeCap = state.Message.Msg.GasFeeCap.String()
+		item.GasPremium = state.Message.Msg.GasPremium.String()
+		item.Method = uint64(state.Message.Msg.Method)
+	}
+
 	item.GasUsed = state.Message.GasCost.GasUsed.Int64()
 	item.GasBurned = state.Message.GasCost.OverEstimationBurn.Int64()
 	item.MinerTip = state.Message.GasCost.MinerTip.String()
@@ -123,6 +127,51 @@ func (t *Node) Connect(address1 string, token string){
 
 func (t *Node) Close(){
 	t.closer()
+}
+
+func (t *Node) StartCache(maxheight int){
+	fmt.Println("cache -> init")
+
+	// listen for new chainhead
+	go func() {
+		var current abi.ChainEpoch = 0
+
+		for {
+			for {
+				log.Printf("cache -> subscribe to chainhead\n")
+				chain, err := t.api.ChainNotify(context.Background())
+
+				if err == nil {
+					for headchanges := range chain {
+						for _, elem := range headchanges {
+							if current < elem.Val.Height() {
+								current = elem.Val.Height()
+								log.Printf("cache -> add tipset %s %s\n", elem.Val.Height()-1, elem.Type)
+								t.ChainGetMessagesInTipset(context.Background(), elem.Val.Parents(), 1)
+							}
+						}
+					}
+				}
+
+				log.Printf("cache -> subscription failed: %s\n", err)
+				time.Sleep(15 * time.Second)
+			}
+		}
+	}()	
+
+	// backfill the cache
+	log.Printf("cache -> backfill\n")
+	ts, _ := t.api.ChainHead(context.Background())
+	for i:=0; i<viper.GetInt("confidence"); i++ {
+		if abi.ChainEpoch(maxheight) >= ts.Height() {
+			break;
+		}
+		go func() {
+			log.Printf("cache -> add tipset %s %d\n", ts.Height(), i)
+			t.ChainGetMessagesInTipset(context.Background(), ts.Key(), i)
+		}()
+		ts, _ = t.ChainGetTipSet(context.Background(), ts.Parents())
+	}
 }
 
 
@@ -226,14 +275,14 @@ func (t *Node) SearchState(ctx context.Context, match Match, limit *int, offset 
 
 	var t1 []*SearchStateStruct
 	for i := 0; i < viper.GetInt("confidence"); i++ {
-		msgs, err := t.ChainGetMessagesInTipset(ctx, ts.Key())
+		//log.Printf("search state: %d height: %d\n", i, ts.Height()-1)
+		msgs, err := t.ChainGetMessagesInTipset(ctx, ts.Key(), i)
 		if err != nil {
 			return nil, 0, xerrors.Errorf("failed to get messages for tipset (%s): %w", ts.Key(), err)
 		}
 
 		for _, iter := range msgs {
 			if match(iter) {
-				log.Printf("search state match")
 				t1 = append(t1, &SearchStateStruct{Message: *iter, Tipset: ts})
 			}
 		}
@@ -276,8 +325,8 @@ func (t *Node) SearchState(ctx context.Context, match Match, limit *int, offset 
 	return res, _count, nil
 }
 
-func (t *Node) ChainGetMessagesInTipset(p0 context.Context, p1 types.TipSetKey) ([]*lotusapi.InvocResult, error) {
-	var key = "node/chain/messages/tipset/" + p1.String()
+func (t *Node) ChainGetMessagesInTipset(p0 context.Context, p1 types.TipSetKey, p3 int) ([]*lotusapi.InvocResult, error) {
+	var key = "node/chain/tipset/messages/" + p1.String()
 
 	// look in cache
 	value, found := t.cache.Get(key)
@@ -289,9 +338,36 @@ func (t *Node) ChainGetMessagesInTipset(p0 context.Context, p1 types.TipSetKey) 
 	// get messages in tipset
 	msgs, err := t.api.ChainGetMessagesInTipset(p0, p1)
 	if err != nil {
+		log.Printf("error tipset %s\n", err)
 		return nil, err
 	}
-	
+
+	// if we are close to chainhead don't run state compute
+	if p3 < 1 {
+		log.Printf("cache -> ignore t=%d\n", p3)
+		var tinvoc []*lotusapi.InvocResult
+		for _, iter := range msgs {
+			tmp := lotusapi.InvocResult{
+				Msg: iter.Message,
+				MsgRct: nil,
+				MsgCid: iter.Cid,
+				GasCost: api.MsgGasCost{
+					Message:            iter.Cid,
+					GasUsed:            big.NewInt(0),
+					BaseFeeBurn:        big.NewInt(0),
+					OverEstimationBurn: big.NewInt(0),
+					MinerPenalty:       big.NewInt(0),
+					MinerTip:           big.NewInt(0),
+					Refund:             big.NewInt(0),
+					TotalCost:          big.NewInt(0),
+				},
+			}
+
+			tinvoc = append(tinvoc, &tmp)
+		}
+		return tinvoc, nil
+	}
+
 	var tmsg []*types.Message
 	for _, iter := range msgs {
 		tmsg = append(tmsg, iter.Message)
@@ -304,7 +380,8 @@ func (t *Node) ChainGetMessagesInTipset(p0 context.Context, p1 types.TipSetKey) 
 	}
 
 	// add to cache
-	t.cache.SetWithTTL(key, res.Trace, 1, 30*time.Minute)
+	log.Printf("cache -> done t=%d\n", p3)
+	t.cache.SetWithTTL(key, res.Trace, 1, 60*time.Minute)
 
 	return res.Trace, err
 }
@@ -326,7 +403,7 @@ func (t *Node) ChainGetTipSet(p0 context.Context, p1 types.TipSetKey) (*types.Ti
 	}
 
 	// add to cache
-	t.cache.SetWithTTL(key, *tipset, 1, 30*time.Minute)
+	t.cache.SetWithTTL(key, *tipset, 1, 60*time.Minute)
 
 	return tipset, err
 }

@@ -62,14 +62,15 @@ var daemonCmd = &cobra.Command{
 	nodeService.Connect(config.LotusAddress, config.LotusToken)
 	defer nodeService.Close()
 
-	// actorService := &postgres.Actor{}
-	// actorService.Init(db)
 	messageService := &postgres.Message{}
 	messageService.Init(db)
 	messageConfirmedService := &postgres.MessageConfirmed{}
 	messageConfirmedService.Init(db, cache)
 	blockService := &postgres.BlockHeader{}
 	blockService.Init(db)
+
+	maxheight, _ := messageConfirmedService.GetMaxHeight()
+	nodeService.StartCache(maxheight)
 
 	router := chi.NewRouter()
 
