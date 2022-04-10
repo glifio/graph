@@ -1,5 +1,11 @@
 package model
 
+import (
+	"strconv"
+
+	"github.com/filecoin-project/lotus/chain/types"
+)
+
 type Message struct {
 	Cid        string  `json:"cid"`
 	Version    *uint64 `json:"version"`
@@ -43,4 +49,42 @@ type MessageConfirmed struct {
 	GasRefund          int64    `json:"gasRefund"`
 	GasBurned          int64    `json:"gasBurned"`
 	Params             *string  `json:"params"`
+}
+
+type MessagePending struct {
+	Cid        string   `json:"cid"`
+	Version    string   `json:"version"`
+	From       string   `json:"from"`
+	To         string   `json:"to"`
+	// To         *Address `json:"to"`
+	// From       *Address `json:"from"`
+	Nonce      *string  `json:"nonce"`
+	Value      string   `json:"value"`
+	GasLimit   *string  `json:"gasLimit"`
+	GasFeeCap  *string  `json:"gasFeeCap"`
+	GasPremium *string  `json:"gasPremium"`
+	Method     string   `json:"method"`
+	Height     string   `json:"height"`
+	Params     *string  `json:"params"`
+}
+
+func StrPtr(x string) *string {
+    return &x
+}
+
+func CreatePendingMessage(item *types.Message) *MessagePending {
+	message := &MessagePending{
+		Cid:        item.Cid().String(),
+		Version:    strconv.FormatUint(item.Version, 10),
+		From:		item.From.String(),
+		To:			item.To.String(),
+		Nonce:      StrPtr(strconv.FormatUint(item.Nonce, 10)),
+		Value:      item.Value.String(),
+		GasLimit:   StrPtr(strconv.FormatInt(item.GasLimit, 10)),
+		GasFeeCap:  StrPtr(item.GasFeeCap.String()),
+		GasPremium: StrPtr(item.GasPremium.String()),
+		Method:     item.Method.String(),
+	}
+	
+	return message;
 }

@@ -261,9 +261,7 @@ func (t *Node) MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error) 
 		return nil, err
 	}
 	
-	pending, err := t.api.MsigGetPending(context.Background(), res, types.EmptyTSK)
-
-	return pending, err
+	return t.api.MsigGetPending(context.Background(), res, types.EmptyTSK)
 }
 
 // match types take an *types.Message and return a bool value.

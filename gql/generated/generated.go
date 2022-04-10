@@ -37,6 +37,7 @@ type Config struct {
 
 type ResolverRoot interface {
 	MessageConfirmed() MessageConfirmedResolver
+	MessagePending() MessagePendingResolver
 	Query() QueryResolver
 	Subscription() SubscriptionResolver
 }
@@ -162,9 +163,9 @@ type ComplexityRoot struct {
 		Messages             func(childComplexity int, address *string, limit *int, offset *int) int
 		MessagesConfirmed    func(childComplexity int, address *string, limit *int, offset *int) int
 		MpoolPending         func(childComplexity int, address *string) int
-		MsigPending          func(childComplexity int, address *string, limit *int, offset *int) int
+		MsigPending          func(childComplexity int, address string) int
 		PendingMessage       func(childComplexity int, cid string) int
-		PendingMessages      func(childComplexity int, address *string, limit *int, offset *int) int
+		PendingMessages      func(childComplexity int, address *string) int
 		StateListMessages    func(childComplexity int, address string, lookback *int) int
 	}
 
@@ -193,18 +194,22 @@ type MessageConfirmedResolver interface {
 
 	Block(ctx context.Context, obj *model.MessageConfirmed) (*model.Block, error)
 }
+type MessagePendingResolver interface {
+	To(ctx context.Context, obj *model.MessagePending) (*model.Address, error)
+	From(ctx context.Context, obj *model.MessagePending) (*model.Address, error)
+}
 type QueryResolver interface {
 	Block(ctx context.Context, address string, height int64) (*model.Block, error)
 	Message(ctx context.Context, cid string, height *int) (*model.MessageConfirmed, error)
 	Messages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessageConfirmed, error)
 	PendingMessage(ctx context.Context, cid string) (*model.MessagePending, error)
-	PendingMessages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessagePending, error)
+	PendingMessages(ctx context.Context, address *string) ([]*model.MessagePending, error)
 	MpoolPending(ctx context.Context, address *string) ([]*model.MpoolUpdate, error)
 	MessagesConfirmed(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessageConfirmed, error)
 	Address(ctx context.Context, str string) (*model.Address, error)
 	Actor(ctx context.Context, address string) (*model.Actor, error)
 	Actors(ctx context.Context) ([]*model.Actor, error)
-	MsigPending(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MsigTransaction, error)
+	MsigPending(ctx context.Context, address string) ([]*model.MsigTransaction, error)
 	StateListMessages(ctx context.Context, address string, lookback *int) ([]*model.MessageConfirmed, error)
 	MessageLowConfidence(ctx context.Context, cid string) (*model.MessageConfirmed, error)
 }
@@ -907,7 +912,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.MsigPending(childComplexity, args["address"].(*string), args["limit"].(*int), args["offset"].(*int)), true
+		return e.complexity.Query.MsigPending(childComplexity, args["address"].(string)), true
 
 	case "Query.pendingMessage":
 		if e.complexity.Query.PendingMessage == nil {
@@ -931,7 +936,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.PendingMessages(childComplexity, args["address"].(*string), args["limit"].(*int), args["offset"].(*int)), true
+		return e.complexity.Query.PendingMessages(childComplexity, args["address"].(*string)), true
 
 	case "Query.stateListMessages":
 		if e.complexity.Query.StateListMessages == nil {
@@ -1082,11 +1087,7 @@ type Query {
     offset: Int = 0
   ): [MessageConfirmed]
   pendingMessage(cid: String!): MessagePending #mempool
-  pendingMessages(
-    address: String
-    limit: Int = 5
-    offset: Int = 0
-  ): [MessagePending!]! #mempool
+  pendingMessages(address: String): [MessagePending!]! #mempool
   mpoolPending(address: String): [MpoolUpdate!]! #mempool
   messagesConfirmed(
     address: String
@@ -1096,11 +1097,7 @@ type Query {
   address(str: String!): Address
   actor(address: String!): Actor
   actors: [Actor!]!
-  msigPending(
-    address: String
-    limit: Int = 5
-    offset: Int = 0
-  ): [MsigTransaction!]!
+  msigPending(address: String!): [MsigTransaction!]!
   stateListMessages(address: String!, lookback: Int = 50): [MessageConfirmed]
   messageLowConfidence(cid: String!): MessageConfirmed!
 }
@@ -1455,33 +1452,15 @@ func (ec *executionContext) field_Query_mpoolPending_args(ctx context.Context, r
 func (ec *executionContext) field_Query_msigPending_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 *string
+	var arg0 string
 	if tmp, ok := rawArgs["address"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("address"))
-		arg0, err = ec.unmarshalOString2ᚖstring(ctx, tmp)
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
 	args["address"] = arg0
-	var arg1 *int
-	if tmp, ok := rawArgs["limit"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
-		arg1, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["limit"] = arg1
-	var arg2 *int
-	if tmp, ok := rawArgs["offset"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("offset"))
-		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["offset"] = arg2
 	return args, nil
 }
 
@@ -1512,24 +1491,6 @@ func (ec *executionContext) field_Query_pendingMessages_args(ctx context.Context
 		}
 	}
 	args["address"] = arg0
-	var arg1 *int
-	if tmp, ok := rawArgs["limit"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
-		arg1, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["limit"] = arg1
-	var arg2 *int
-	if tmp, ok := rawArgs["offset"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("offset"))
-		arg2, err = ec.unmarshalOInt2ᚖint(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["offset"] = arg2
 	return args, nil
 }
 
@@ -3733,14 +3694,14 @@ func (ec *executionContext) _MessagePending_to(ctx context.Context, field graphq
 		Object:     "MessagePending",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.To, nil
+		return ec.resolvers.MessagePending().To(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3768,14 +3729,14 @@ func (ec *executionContext) _MessagePending_from(ctx context.Context, field grap
 		Object:     "MessagePending",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.From, nil
+		return ec.resolvers.MessagePending().From(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -4550,7 +4511,7 @@ func (ec *executionContext) _Query_pendingMessages(ctx context.Context, field gr
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().PendingMessages(rctx, args["address"].(*string), args["limit"].(*int), args["offset"].(*int))
+		return ec.resolvers.Query().PendingMessages(rctx, args["address"].(*string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -4789,7 +4750,7 @@ func (ec *executionContext) _Query_msigPending(ctx context.Context, field graphq
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().MsigPending(rctx, args["address"].(*string), args["limit"].(*int), args["offset"].(*int))
+		return ec.resolvers.Query().MsigPending(rctx, args["address"].(string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6805,29 +6766,47 @@ func (ec *executionContext) _MessagePending(ctx context.Context, sel ast.Selecti
 		case "cid":
 			out.Values[i] = ec._MessagePending_cid(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "version":
 			out.Values[i] = ec._MessagePending_version(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "to":
-			out.Values[i] = ec._MessagePending_to(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._MessagePending_to(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
 		case "from":
-			out.Values[i] = ec._MessagePending_from(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._MessagePending_from(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
 		case "nonce":
 			out.Values[i] = ec._MessagePending_nonce(ctx, field, obj)
 		case "value":
 			out.Values[i] = ec._MessagePending_value(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "gasLimit":
 			out.Values[i] = ec._MessagePending_gasLimit(ctx, field, obj)
@@ -6838,12 +6817,12 @@ func (ec *executionContext) _MessagePending(ctx context.Context, sel ast.Selecti
 		case "method":
 			out.Values[i] = ec._MessagePending_method(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "height":
 			out.Values[i] = ec._MessagePending_height(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "params":
 			out.Values[i] = ec._MessagePending_params(ctx, field, obj)

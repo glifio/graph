@@ -14,11 +14,7 @@ type Query {
     offset: Int = 0
   ): [MessageConfirmed]
   pendingMessage(cid: String!): MessagePending #mempool
-  pendingMessages(
-    address: String
-    limit: Int = 5
-    offset: Int = 0
-  ): [MessagePending!]! #mempool
+  pendingMessages(address: String): [MessagePending!]! #mempool
   mpoolPending(address: String): [MpoolUpdate!]! #mempool
   messagesConfirmed(
     address: String
@@ -28,11 +24,7 @@ type Query {
   address(str: String!): Address
   actor(address: String!): Actor
   actors: [Actor!]!
-  msigPending(
-    address: String
-    limit: Int = 5
-    offset: Int = 0
-  ): [MsigTransaction!]!
+  msigPending(address: String!): [MsigTransaction!]!
   stateListMessages(address: String!, lookback: Int = 50): [MessageConfirmed]
   messageLowConfidence(cid: String!): MessageConfirmed!
 }

@@ -39,21 +39,6 @@ type ChainHead struct {
 	Height int64 `json:"height"`
 }
 
-type MessagePending struct {
-	Cid        string   `json:"cid"`
-	Version    string   `json:"version"`
-	To         *Address `json:"to"`
-	From       *Address `json:"from"`
-	Nonce      *string  `json:"nonce"`
-	Value      string   `json:"value"`
-	GasLimit   *string  `json:"gasLimit"`
-	GasFeeCap  *string  `json:"gasFeeCap"`
-	GasPremium *string  `json:"gasPremium"`
-	Method     string   `json:"method"`
-	Height     string   `json:"height"`
-	Params     *string  `json:"params"`
-}
-
 type MpoolUpdate struct {
 	Type    int             `json:"type"`
 	Message *MessagePending `json:"message"`

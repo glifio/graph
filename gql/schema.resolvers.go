@@ -22,19 +22,17 @@ import (
 	"github.com/glifio/graph/gql/model"
 	util "github.com/glifio/graph/internal/utils"
 	"github.com/google/uuid"
-	"github.com/ipfs/go-cid"
+	gocid "github.com/ipfs/go-cid"
 	"github.com/jinzhu/copier"
 	"golang.org/x/crypto/blake2b"
 )
 
 func (r *messageConfirmedResolver) From(ctx context.Context, obj *model.MessageConfirmed) (*model.Address, error) {
-	addr, err := r.NodeService.AddressLookup(obj.From)
-	return addr, err
+	return r.NodeService.AddressLookup(obj.From)
 }
 
 func (r *messageConfirmedResolver) To(ctx context.Context, obj *model.MessageConfirmed) (*model.Address, error) {
-	addr, err := r.NodeService.AddressLookup(obj.To)
-	return addr, err
+	return r.NodeService.AddressLookup(obj.To)
 }
 
 func (r *messageConfirmedResolver) MethodName(ctx context.Context, obj *model.MessageConfirmed) (string, error) {
@@ -70,6 +68,14 @@ func (r *messageConfirmedResolver) Block(ctx context.Context, obj *model.Message
 	return &item, err
 }
 
+func (r *messagePendingResolver) To(ctx context.Context, obj *model.MessagePending) (*model.Address, error) {
+	return r.NodeService.AddressLookup(obj.To)
+}
+
+func (r *messagePendingResolver) From(ctx context.Context, obj *model.MessagePending) (*model.Address, error) {
+	return r.NodeService.AddressLookup(obj.From)
+}
+
 func (r *queryResolver) Block(ctx context.Context, address string, height int64) (*model.Block, error) {
 	block, err := r.BlockService.GetByMessage(height, address)
 	if err != nil {
@@ -80,11 +86,11 @@ func (r *queryResolver) Block(ctx context.Context, address string, height int64)
 	return &item, err
 }
 
-func (r *queryResolver) Message(ctx context.Context, _cid string, height *int) (*model.MessageConfirmed, error) {
+func (r *queryResolver) Message(ctx context.Context, cid string, height *int) (*model.MessageConfirmed, error) {
 	limit := 1
 	offset := 0
 
-	msgCID, _ := cid.Decode(_cid)
+	msgCID, _ := gocid.Decode(cid)
 	maxheight, _ := r.MessageConfirmedService.GetMaxHeight()
 
 	// Look in State
@@ -107,7 +113,7 @@ func (r *queryResolver) Message(ctx context.Context, _cid string, height *int) (
 	}
 
 	// Look in Lily
-	msg, parsed, err := r.MessageConfirmedService.Get(_cid, height)
+	msg, parsed, err := r.MessageConfirmedService.Get(cid, height)
 	if err != nil {
 		return nil, err
 	}
@@ -209,27 +215,8 @@ func (r *queryResolver) PendingMessage(ctx context.Context, cid string) (*model.
 
 	for _, item := range pending {
 		if item.Cid().String() == cid {
-			var msg model.MessagePending
+			msg := model.CreatePendingMessage(&item.Message)
 			msg.Cid = item.Cid().String()
-			msg.Version = strconv.FormatUint(item.Message.Version, 10)
-			msg.Method = item.Message.Method.String()
-			msg.GasFeeCap = new(string)
-			var gasfeecap = item.Message.GasFeeCap.String()
-			msg.GasFeeCap = &gasfeecap
-
-			msg.Value = item.Message.Value.String()
-
-			fromaddr, _ := r.NodeService.AddressLookup(item.Message.From.String())
-			msg.From = fromaddr
-			toaddr, _ := r.NodeService.AddressLookup(item.Message.To.String())
-			msg.To = toaddr
-
-			msg.GasPremium = new(string)
-			var gasPremium = item.Message.GasPremium.String()
-			msg.GasPremium = &gasPremium
-
-			var gaslimit = strconv.FormatInt(item.Message.GasLimit, 10)
-			msg.GasLimit = &gaslimit
 
 			obj, err := r.NodeService.StateDecodeParams(item.Message.To, item.Message.Method, item.Message.Params)
 
@@ -237,13 +224,13 @@ func (r *queryResolver) PendingMessage(ctx context.Context, cid string) (*model.
 				msg.Params = &obj
 			}
 
-			return &msg, nil
+			return msg, nil
 		}
 	}
 	return nil, nil
 }
 
-func (r *queryResolver) PendingMessages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessagePending, error) {
+func (r *queryResolver) PendingMessages(ctx context.Context, address *string) ([]*model.MessagePending, error) {
 	var items []*model.MessagePending
 
 	pending, err := r.NodeService.GetPending()
@@ -252,44 +239,41 @@ func (r *queryResolver) PendingMessages(ctx context.Context, address *string, li
 		return nil, err
 	}
 
-	queryAddress, _ := r.NodeService.AddressLookup(*address)
+	var queryAddress *model.Address
+	if address != nil {
+		queryAddress, _ = r.NodeService.AddressLookup(*address)
+	}
 
-	for _, item := range pending {
-		var msg model.MessagePending
-
-		if queryAddress.Robust == item.Message.From.String() || queryAddress.Robust == item.Message.To.String() ||
-			queryAddress.ID == item.Message.From.String() || queryAddress.ID == item.Message.To.String() {
-
+	if address == nil {
+		for _, item := range pending {
+			msg := model.CreatePendingMessage(&item.Message)
 			msg.Cid = item.Cid().String()
-			msg.Version = strconv.FormatUint(item.Message.Version, 10)
-			msg.Method = item.Message.Method.String()
-			msg.GasFeeCap = new(string)
-			var gasfeecap = item.Message.GasFeeCap.String()
-			msg.GasFeeCap = &gasfeecap
 
-			// todo optimize
-			fromaddr, _ := r.NodeService.AddressLookup(item.Message.From.String())
-			msg.From = fromaddr
-			toaddr, _ := r.NodeService.AddressLookup(item.Message.To.String())
-			msg.To = toaddr
-
-			msg.Value = item.Message.Value.String()
-
-			msg.GasPremium = new(string)
-			var gasPremium = item.Message.GasPremium.String()
-			msg.GasPremium = &gasPremium
-
-			var gaslimit = strconv.FormatInt(item.Message.GasLimit, 10)
-			msg.GasLimit = &gaslimit
-
-			obj, err := r.NodeService.StateDecodeParams(item.Message.To, item.Message.Method, item.Message.Params)
-			if err == nil && obj != "" {
-				msg.Params = &obj
+			params, err := r.NodeService.StateDecodeParams(item.Message.To, item.Message.Method, item.Message.Params)
+			if err == nil && params != "" {
+				msg.Params = &params
 			}
 
-			items = append(items, &msg)
+			items = append(items, msg)
+		}
+	} else {
+		for _, item := range pending {
+			if queryAddress.Robust == item.Message.From.String() || queryAddress.Robust == item.Message.To.String() ||
+				queryAddress.ID == item.Message.From.String() || queryAddress.ID == item.Message.To.String() {
+
+				msg := model.CreatePendingMessage(&item.Message)
+				msg.Cid = item.Cid().String()
+
+				params, err := r.NodeService.StateDecodeParams(item.Message.To, item.Message.Method, item.Message.Params)
+				if err == nil && params != "" {
+					msg.Params = &params
+				}
+
+				items = append(items, msg)
+			}
 		}
 	}
+
 	return items, nil
 }
 
@@ -366,22 +350,19 @@ func (r *queryResolver) Actors(ctx context.Context) ([]*model.Actor, error) {
 	// return items, nil
 }
 
-func (r *queryResolver) MsigPending(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MsigTransaction, error) {
+func (r *queryResolver) MsigPending(ctx context.Context, address string) ([]*model.MsigTransaction, error) {
 	var items []*model.MsigTransaction
-	//var rs []derived.GasOutputs
-	pending, err := r.NodeService.MsigGetPending(*address)
+
+	pending, err := r.NodeService.MsigGetPending(address)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(pending) < *offset {
-		return nil, nil
-	}
-
-	for _, iter := range pending[*offset:util.Min(*offset+*limit, len(pending))] {
+	for _, iter := range pending {
 		var item model.MsigTransaction
 		item.ID = iter.ID
 		item.Method = uint64(iter.Method)
+
 		obj, err := r.NodeService.StateDecodeParams(iter.To, iter.Method, iter.Params)
 
 		if err == nil && obj != "" {
@@ -616,9 +597,9 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 					res.Message.Cid = msg.Message.Cid().String()
 					res.Message.Version = strconv.FormatUint(msg.Message.Message.Version, 10)
 					fromaddr, _ := r.NodeService.AddressLookup(msg.Message.Message.From.String())
-					res.Message.From = fromaddr
+					res.Message.From = msg.Message.Message.From.String()
 					toaddr, _ := r.NodeService.AddressLookup(msg.Message.Message.To.String())
-					res.Message.To = toaddr
+					res.Message.To = msg.Message.Message.To.String()
 					nonce := strconv.FormatUint(msg.Message.Message.Nonce, 10)
 					res.Message.Nonce = &nonce
 					res.Message.Value = msg.Message.Message.Value.String()
@@ -638,8 +619,8 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 
 					r.mu.Lock()
 					for _, observer := range r.MpoolObserver.Observers {
-						if res.Message.From.Robust == observer.address || res.Message.To.Robust == observer.address ||
-							res.Message.From.ID == observer.address || res.Message.To.ID == observer.address {
+						if fromaddr.Robust == observer.address || toaddr.Robust == observer.address ||
+							fromaddr.ID == observer.address || toaddr.ID == observer.address {
 							//fmt.Printf("update: %s cid: %s\n", observer.address, res.Message.Cid)
 							observer.update <- &res
 						}
@@ -679,6 +660,11 @@ func (r *Resolver) MessageConfirmed() generated.MessageConfirmedResolver {
 	return &messageConfirmedResolver{r}
 }
 
+// MessagePending returns generated.MessagePendingResolver implementation.
+func (r *Resolver) MessagePending() generated.MessagePendingResolver {
+	return &messagePendingResolver{r}
+}
+
 // Query returns generated.QueryResolver implementation.
 func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 
@@ -686,5 +672,6 @@ func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 func (r *Resolver) Subscription() generated.SubscriptionResolver { return &subscriptionResolver{r} }
 
 type messageConfirmedResolver struct{ *Resolver }
+type messagePendingResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type subscriptionResolver struct{ *Resolver }
