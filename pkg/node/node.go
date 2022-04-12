@@ -17,6 +17,7 @@ import (
 	lotusapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/glifio/graph/gql/model"
 	"github.com/ipfs/go-cid"
 	"github.com/spf13/viper"
@@ -97,7 +98,7 @@ func (t *Node) Node() *Node {
 	return t
 }
 
-func (t *Node) Connect(address1 string, token string){
+func (t *Node) Connect(address1 string, token string) (dtypes.NetworkName, error){
 	head := http.Header{}
 
 	if token != "" {
@@ -118,11 +119,12 @@ func (t *Node) Connect(address1 string, token string){
 	fmt.Println("network name: ", name)
 	if name == "mainnet" {
 		address.CurrentNetwork = address.Mainnet
-		fmt.Println("address network : mainnet")
+		log.Println("address network : mainnet")
 	} else {
 		address.CurrentNetwork = address.Testnet
-		fmt.Println("address network : testnet")
+		log.Println("address network : testnet")
 	}
+	return name, nil
 }
 
 func (t *Node) Close(){
@@ -130,7 +132,7 @@ func (t *Node) Close(){
 }
 
 func (t *Node) StartCache(maxheight int){
-	fmt.Println("cache -> init")
+	log.Println("cache -> init")
 
 	// listen for new chainhead
 	go func() {

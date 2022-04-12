@@ -18,6 +18,7 @@ type Config struct {
 	DbSchema     	string        `mapstructure:"DB_SCHEMA"`
 	LotusToken  	string        `mapstructure:"LOTUS_TOKEN"`
 	LotusAddress  	string        `mapstructure:"LOTUS_ADDR"`
+	SentryDns    	string        `mapstructure:"SENTRY_DSN"`
 }
 
 // LoadConfig reads configuration from file or environment variables.

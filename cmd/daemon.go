@@ -13,6 +13,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/dgraph-io/ristretto"
+	"github.com/getsentry/sentry-go"
 	graph "github.com/glifio/graph/gql"
 	"github.com/glifio/graph/gql/generated"
 	util "github.com/glifio/graph/internal/utils"
@@ -35,7 +36,7 @@ var daemonCmd = &cobra.Command{
   Run: func(cmd *cobra.Command, args []string) {
 	config, _ := util.LoadConfig(".")
 
-	log.Println("start the cache")
+	log.Println("start -> cache")
 	cache, err := ristretto.NewCache(&ristretto.Config{
 		NumCounters: 1e7,     // number of keys to track frequency of (10M).
 		MaxCost:     1 << 30, // maximum cost of cache (1GB).
@@ -47,7 +48,7 @@ var daemonCmd = &cobra.Command{
 
 	cache.Clear()
 
-    log.Println("start the graphQL server")
+    log.Println("start -> graphQL server")
 	// Create a new connection to our pg database
 	var db postgres.Database
 	err = db.New(config.DbHost, config.DbPort, config.DbUser, config.DbPassword, config.DbDatabase, config.DbSchema)
@@ -59,7 +60,7 @@ var daemonCmd = &cobra.Command{
 
 	nodeService := &node.Node{}
 	nodeService.Init(cache)
-	nodeService.Connect(config.LotusAddress, config.LotusToken)
+	network, _ := nodeService.Connect(config.LotusAddress, config.LotusToken)
 	defer nodeService.Close()
 
 	messageService := &postgres.Message{}
@@ -71,6 +72,19 @@ var daemonCmd = &cobra.Command{
 
 	maxheight, _ := messageConfirmedService.GetMaxHeight()
 	nodeService.StartCache(maxheight)
+
+	log.Printf("start -> sentry %s\n", config.SentryDns)
+	err = sentry.Init(sentry.ClientOptions{
+		Dsn: config.SentryDns,
+		Environment: string(network),
+		Debug: true,
+	})
+	if err != nil {
+		log.Fatalf("sentry.Init: %s", err)
+	}	
+
+	// Flush buffered events before the program terminates.
+	defer sentry.Flush(2 * time.Second)
 
 	router := chi.NewRouter()
 
