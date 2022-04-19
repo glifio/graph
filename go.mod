@@ -28,6 +28,10 @@ require (
 
 require (
 	github.com/dgraph-io/ristretto v0.0.3-0.20200630154024-f66de99634de
+	github.com/fxamacker/cbor/v2 v2.4.0 // indirect
+	github.com/getsentry/sentry-go v0.13.0 // indirect
+	github.com/go-pg/pg/extra/pgdebug v0.2.0 // indirect
+	github.com/minio/sha256-simd v1.0.0 // indirect
 	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 )
