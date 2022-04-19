@@ -18,7 +18,9 @@ import (
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
+	"github.com/fxamacker/cbor/v2"
 	"github.com/glifio/graph/gql/model"
+	"github.com/glifio/graph/pkg/postgres"
 	"github.com/ipfs/go-cid"
 	"github.com/spf13/viper"
 	"golang.org/x/xerrors"
@@ -46,6 +48,7 @@ type Node struct {
 	closer jsonrpc.ClientCloser
 	api v0api.FullNodeStruct
 	cache *ristretto.Cache
+	db postgres.Database
 }
 
 type SearchStateStruct struct {
@@ -89,8 +92,9 @@ func (state *SearchStateStruct) ConfirmedMessage(t *Node) model.MessageConfirmed
 	return item
 }
 
-func (t *Node) Init(cache *ristretto.Cache) error {
+func (t *Node) Init(cache *ristretto.Cache, db postgres.Database) error {
 	t.cache = cache;
+	t.db = db;
 	return nil
 }
 
@@ -168,10 +172,10 @@ func (t *Node) StartCache(maxheight int){
 		if abi.ChainEpoch(maxheight) >= ts.Height() {
 			break;
 		}
-		go func() {
+		go func(tipset types.TipSet, i int) {
 			log.Printf("cache -> add tipset %s %d\n", ts.Height(), i)
 			t.ChainGetMessagesInTipset(context.Background(), ts.Key(), i)
-		}()
+		}(*ts, i)
 		ts, _ = t.ChainGetTipSet(context.Background(), ts.Parents())
 	}
 }
@@ -379,6 +383,24 @@ func (t *Node) ChainGetMessagesInTipset(p0 context.Context, p1 types.TipSetKey, 
 		return nil, err
 	}
 
+	for _, iter := range res.Trace {
+		if iter.Msg.To.String()[1:] == "01" && iter.Msg.Method == 2 {
+			log.Println("found msg to 01....!", iter.MsgRct.ExitCode)
+			if iter.MsgRct.ExitCode == 0 {
+				type ExecReturn struct {
+					IDAddress     address.Address // The canonical ID-based address for the actor.
+					RobustAddress address.Address // A more expensive but re-org-safe address for the newly created actor.
+				}
+				log.Println("found new actor....!")
+				v := ExecReturn{};
+				err := cbor.Unmarshal(iter.MsgRct.Return, &v);
+				log.Println(v, err)
+				addr, _ := address.NewActorAddress(iter.MsgRct.Return)
+				log.Println(addr, err)
+			}			
+		}
+	}
+
 	// add to cache
 	log.Printf("cache -> done t=%d\n", p3)
 	t.cache.SetWithTTL(key, res.Trace, 1, 60*time.Minute)
@@ -532,6 +554,15 @@ func (t *Node) AddressLookup(id string) (*model.Address, error){
 			rs, err = t.api.StateAccountKey(context.Background(), addr, types.EmptyTSK)
 			if err == nil {
 				result.Robust = rs.String()
+			} else {
+				// look in db
+				dbaddress := postgres.Address{};
+				dbaddress.Init(t.db);
+				addritem, err := dbaddress.SearchById(addr.String());
+				if addritem == nil || err != nil {
+					return nil, err
+				}				
+				result.Robust = *addritem;
 			}
 		default:
 			result.Robust = addr.String()
@@ -542,7 +573,7 @@ func (t *Node) AddressLookup(id string) (*model.Address, error){
 	}
 
 	// set a value with a cost of 1
-	t.cache.SetWithTTL(key, *result, 1, 30*time.Minute)
+	t.cache.SetWithTTL(key, *result, 1, 60*time.Minute)
 
 	return result, nil
 }

@@ -59,7 +59,7 @@ var daemonCmd = &cobra.Command{
 	defer db.Close()
 
 	nodeService := &node.Node{}
-	nodeService.Init(cache)
+	nodeService.Init(cache, db)
 	network, _ := nodeService.Connect(config.LotusAddress, config.LotusToken)
 	defer nodeService.Close()
 
