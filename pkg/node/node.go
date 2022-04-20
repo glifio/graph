@@ -18,6 +18,7 @@ import (
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
+	"github.com/fxamacker/cbor"
 	"github.com/glifio/graph/gql/model"
 	"github.com/glifio/graph/pkg/postgres"
 	"github.com/ipfs/go-cid"
@@ -382,22 +383,29 @@ func (t *Node) ChainGetMessagesInTipset(p0 context.Context, p1 types.TipSetKey, 
 		return nil, err
 	}
 
+	type ExecReturnBytes struct {
+		_ struct{} `cbor:",toarray"`
+		IDAddress []byte
+		RobustAddress []byte
+	 }
+
 	for _, iter := range res.Trace {
 		if iter.Msg.To.String()[1:] == "01" && iter.Msg.Method == 2 {
 			log.Println("found msg to 01....!", iter.MsgRct.ExitCode)
-			if iter.MsgRct.ExitCode == 0 {
-				// type ExecReturn struct {
-				// 	IDAddress     address.Address // The canonical ID-based address for the actor.
-				// 	RobustAddress address.Address // A more expensive but re-org-safe address for the newly created actor.
-				// }
-				log.Println("found new actor....!")
-				// v := ExecReturn{};
-				// iter.MsgRct.UnmarshalCBOR(base64.NewDecoder())
-				// n, _ := base64.StdEncoding.Decode(dst, iter.MsgRct.Return);
-				// err := cbor.Unmarshal(iter.MsgRct.Return, &v);
-				// log.Println(v, err)
-				// addr, _ := address.NewActorAddress(iter.MsgRct.Return)
-				// log.Println(addr, err)
+			if iter.MsgRct.ExitCode.IsSuccess() {
+				var v ExecReturnBytes;
+				err := cbor.Unmarshal(iter.MsgRct.Return, &v);
+				log.Println(err)
+				idaddr, _ := address.NewFromBytes(v.IDAddress)
+				roaddr, _ := address.NewFromBytes(v.RobustAddress)
+				log.Println(idaddr)
+				log.Println(roaddr)
+				modelAddr := model.Address{
+					ID: idaddr.String(),
+					Robust: roaddr.String(),
+				}
+				t.cache.SetWithTTL(addressLookupKey+idaddr.String(), modelAddr, 1, 60*time.Minute)
+				t.cache.SetWithTTL(addressLookupKey+roaddr.String(), modelAddr, 1, 60*time.Minute)
 			}			
 		}
 	}
@@ -531,8 +539,10 @@ func (t *Node) GetPending() ([]*types.SignedMessage, error) {
 	return status, nil
 }
 
+const addressLookupKey = "node/addr/lookup/"
+
 func (t *Node) AddressLookup(id string) (*model.Address, error){
-	var key = "node/addr/lookup/" + id
+	var key = addressLookupKey + id
 
 	value, found := t.cache.Get(key)
 	if found {
