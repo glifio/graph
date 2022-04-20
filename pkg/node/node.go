@@ -582,8 +582,10 @@ func (t *Node) AddressLookup(id string) (*model.Address, error){
 			}
 	}
 
-	// set a value with a cost of 1
-	t.cache.SetWithTTL(key, *result, 1, 60*time.Minute)
+
+	if result.ID != "" && result.Robust != "" {
+		t.cache.SetWithTTL(key, *result, 1, 60*time.Minute)
+	}
 
 	return result, nil
 }
