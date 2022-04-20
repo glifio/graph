@@ -18,7 +18,6 @@ import (
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
-	"github.com/fxamacker/cbor/v2"
 	"github.com/glifio/graph/gql/model"
 	"github.com/glifio/graph/pkg/postgres"
 	"github.com/ipfs/go-cid"
@@ -387,16 +386,18 @@ func (t *Node) ChainGetMessagesInTipset(p0 context.Context, p1 types.TipSetKey, 
 		if iter.Msg.To.String()[1:] == "01" && iter.Msg.Method == 2 {
 			log.Println("found msg to 01....!", iter.MsgRct.ExitCode)
 			if iter.MsgRct.ExitCode == 0 {
-				type ExecReturn struct {
-					IDAddress     address.Address // The canonical ID-based address for the actor.
-					RobustAddress address.Address // A more expensive but re-org-safe address for the newly created actor.
-				}
+				// type ExecReturn struct {
+				// 	IDAddress     address.Address // The canonical ID-based address for the actor.
+				// 	RobustAddress address.Address // A more expensive but re-org-safe address for the newly created actor.
+				// }
 				log.Println("found new actor....!")
-				v := ExecReturn{};
-				err := cbor.Unmarshal(iter.MsgRct.Return, &v);
-				log.Println(v, err)
-				addr, _ := address.NewActorAddress(iter.MsgRct.Return)
-				log.Println(addr, err)
+				// v := ExecReturn{};
+				// iter.MsgRct.UnmarshalCBOR(base64.NewDecoder())
+				// n, _ := base64.StdEncoding.Decode(dst, iter.MsgRct.Return);
+				// err := cbor.Unmarshal(iter.MsgRct.Return, &v);
+				// log.Println(v, err)
+				// addr, _ := address.NewActorAddress(iter.MsgRct.Return)
+				// log.Println(addr, err)
 			}			
 		}
 	}
@@ -559,10 +560,9 @@ func (t *Node) AddressLookup(id string) (*model.Address, error){
 				dbaddress := postgres.Address{};
 				dbaddress.Init(t.db);
 				addritem, err := dbaddress.SearchById(addr.String());
-				if addritem == nil || err != nil {
-					return nil, err
+				if err == nil && addritem != nil {
+					result.Robust = *addritem;
 				}				
-				result.Robust = *addritem;
 			}
 		default:
 			result.Robust = addr.String()
