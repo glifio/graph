@@ -2,6 +2,7 @@ package util
 
 import (
 	"github.com/filecoin-project/go-state-types/big"
+	"github.com/glifio/graph/gql/model"
 )
 
 func Min(a, b int) int {
@@ -9,6 +10,15 @@ func Min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func AddressCompareFromTo(_address string, _from *model.Address, _to *model.Address) (bool){
+	return AddressCompare(_address, _from) || AddressCompare(_address, _to);
+}
+
+func AddressCompare(_p1 string, _p2 *model.Address) (bool){
+	return (len(_p2.Robust) > 1 && _p2.Robust[1:] == _p1[1:]) ||
+	 (len(_p2.ID) > 1 && _p2.ID[1:] == _p1[1:]);
 }
 
 const (
