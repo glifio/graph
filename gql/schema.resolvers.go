@@ -16,8 +16,8 @@ import (
 
 	"github.com/filecoin-project/lily/model/derived"
 	lotusapi "github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/specs-actors/actors/builtin"
-	"github.com/filecoin-project/specs-actors/actors/builtin/multisig"
+	"github.com/filecoin-project/specs-actors/v7/actors/builtin"
+	"github.com/filecoin-project/specs-actors/v7/actors/builtin/multisig"
 	"github.com/glifio/graph/gql/generated"
 	"github.com/glifio/graph/gql/model"
 	util "github.com/glifio/graph/internal/utils"
@@ -618,9 +618,10 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 					}
 
 					r.mu.Lock()
+					
 					for _, observer := range r.MpoolObserver.Observers {
-						if fromaddr.Robust == observer.address || toaddr.Robust == observer.address ||
-							fromaddr.ID == observer.address || toaddr.ID == observer.address {
+						fmt.Printf("update: %s cid: %s\n", fromaddr.Robust, toaddr.Robust)
+						if util.AddressCompareFromTo(observer.address, fromaddr, toaddr) {
 							//fmt.Printf("update: %s cid: %s\n", observer.address, res.Message.Cid)
 							observer.update <- &res
 						}

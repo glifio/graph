@@ -14,7 +14,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	lotusapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
-	builtin1 "github.com/filecoin-project/specs-actors/actors/builtin"
+	builtin1 "github.com/filecoin-project/specs-actors/v7/actors/builtin"
 	util "github.com/glifio/graph/internal/utils"
 	"github.com/spf13/cobra"
 )

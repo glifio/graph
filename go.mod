@@ -8,8 +8,7 @@ require (
 	github.com/filecoin-project/go-jsonrpc v0.1.5
 	github.com/filecoin-project/go-state-types v0.1.3
 	github.com/filecoin-project/lily v0.8.5
-	github.com/filecoin-project/lotus v1.14.4
-	github.com/filecoin-project/specs-actors v0.9.14
+	github.com/filecoin-project/lotus v1.15.1
 	github.com/go-chi/chi v1.5.4
 	github.com/go-pg/pg/v10 v10.10.6
 	github.com/google/uuid v1.3.0
@@ -27,12 +26,12 @@ require (
 )
 
 require (
-	github.com/dgraph-io/ristretto v0.0.3-0.20200630154024-f66de99634de
-	github.com/fxamacker/cbor v1.5.1 // indirect
-	github.com/fxamacker/cbor/v2 v2.4.0 // indirect
-	github.com/getsentry/sentry-go v0.13.0 // indirect
-	github.com/go-pg/pg/extra/pgdebug v0.2.0 // indirect
-	github.com/minio/sha256-simd v1.0.0 // indirect
+	github.com/dgraph-io/badger/v2 v2.2007.4 // indirect
+	github.com/dgraph-io/ristretto v0.1.0
+	github.com/filecoin-project/specs-actors/v7 v7.0.0
+	github.com/fxamacker/cbor v1.5.1
+	github.com/getsentry/sentry-go v0.13.0
+	github.com/go-pg/pg/extra/pgdebug v0.2.0
 	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 )
