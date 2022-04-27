@@ -120,21 +120,21 @@ func (t *MessageConfirmed) Search(address *model.Address, limit int, offset int)
 			WhereOr("gas_outputs.from = ?", address.Robust).
 			WhereOr("gas_outputs.to = ?", address.ID).		
 			WhereOr("gas_outputs.to = ?", address.Robust).
-			Order("height desc").
+			// Order("height desc").
 			// Limit(limit).
 			// Offset(offset).
 			Select()
 		if err != nil {
 			return nil, err
 		}
+		// sort by height desc
+		sort.Slice(msgs, func(i, j int) bool {
+			return msgs[i].Height > msgs[j].Height
+		})
+
 		// set cache
 		t.cache.SetWithTTL("msg:confirm:search:" + address.Robust, msgs, 1, 1*time.Minute)
 	}
-
-	// // sort the result by height desc
-	// sort.Slice(msgs, func(i, j int) bool {
-	// 	return msgs[i].Height > msgs[j].Height
-	// })
 
 	// limit and offset
 	_limit := limit
