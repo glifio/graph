@@ -150,10 +150,11 @@ func (t *Node) StartCache(maxheight int){
 				if err == nil {
 					for headchanges := range chain {
 						for _, elem := range headchanges {
-							if current < elem.Val.Height() {
+							if current < elem.Val.Height() {								
 								current = elem.Val.Height()
 								log.Printf("cache -> add tipset %s %s\n", elem.Val.Height()-1, elem.Type)
 								t.ChainGetMessagesInTipset(context.Background(), elem.Val.Parents(), 1)
+								t.cache.Set("node/chainhead/tipsetkey", elem.Val.Parents(), 1)
 							}
 						}
 					}
@@ -275,7 +276,23 @@ type Match func(*lotusapi.InvocResult) bool
 
 
 func (t *Node) SearchState(ctx context.Context, match Match, limit *int, offset *int, height int) ([]*SearchStateStruct, int, error) {
-	ts, _ := t.api.ChainHead(ctx)
+	// look in cache
+	var ts *types.TipSet
+	var err error
+
+	// get last tipsetkey from cache or default to chainhead
+	value, found := t.cache.Get("node/chainhead/tipsetkey")
+	if found {
+		tsk := value.(types.TipSetKey)
+		ts, err = t.ChainGetTipSet(ctx, tsk)
+		log.Println("cache: hit tipsetkey");
+		if err != nil {
+			ts, _ = t.api.ChainHead(ctx)
+		}
+
+	} else {
+		ts, _ = t.api.ChainHead(ctx)
+	}
 
 	var t1 []*SearchStateStruct
 	for i := 0; i < viper.GetInt("confidence"); i++ {

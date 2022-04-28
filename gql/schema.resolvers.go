@@ -127,7 +127,7 @@ func (r *queryResolver) Message(ctx context.Context, cid string, height *int) (*
 	if parsed != nil {
 		item.Params = &parsed.Params
 	}
-	log.Printf("message: found in lily: %d\n", item.Nonce)
+	
 	return &item, err
 }
 
