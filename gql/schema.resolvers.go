@@ -576,16 +576,16 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 		go func() {
 			for {
 				for {
-					log.Printf("subscribe to mpoolsub\n")
+					log.Printf("mpoolsub subscription -> connecting...\n")
 					mpoolsub, err := r.NodeService.MpoolSub(context.TODO())
 
 					if err == nil {
 						r.MpoolObserver.channel = mpoolsub
-						log.Printf("mpoolsub subscription success\n")
+						log.Printf("mpoolsub subscription -> success\n")
 						break
 					}
 
-					log.Printf("...mpoolsub subscription failed: %s\n", err)
+					log.Printf("mpoolsub subscription -> failed!: %s\n", err)
 					time.Sleep(15 * time.Second)
 				}
 
@@ -596,9 +596,9 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 					res.Message = &model.MessagePending{}
 					res.Message.Cid = msg.Message.Cid().String()
 					res.Message.Version = strconv.FormatUint(msg.Message.Message.Version, 10)
-					fromaddr, _ := r.NodeService.AddressLookup(msg.Message.Message.From.String())
+					//fromaddr, _ := r.NodeService.AddressLookup(msg.Message.Message.From.String())
 					res.Message.From = msg.Message.Message.From.String()
-					toaddr, _ := r.NodeService.AddressLookup(msg.Message.Message.To.String())
+					//toaddr, _ := r.NodeService.AddressLookup(msg.Message.Message.To.String())
 					res.Message.To = msg.Message.Message.To.String()
 					nonce := strconv.FormatUint(msg.Message.Message.Nonce, 10)
 					res.Message.Nonce = &nonce
@@ -611,22 +611,25 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 					res.Message.GasPremium = &gaspremium
 					res.Message.Method = msg.Message.Message.Method.String()
 
-					obj, err := r.NodeService.StateDecodeParams(msg.Message.Message.To, msg.Message.Message.Method, msg.Message.Message.Params)
-
-					if err == nil && obj != "" {
-						res.Message.Params = &obj
-					}
-
 					r.mu.Lock()
 					
 					for _, observer := range r.MpoolObserver.Observers {
-						if util.AddressCompareFromTo(observer.address, fromaddr, toaddr) {
+						if(msg.Message.Message.From.String() == observer.address){
+							log.Printf("mpoolsub subscription -> from: %s %s\n", res.Message.From, res.Message.To)
+						}
+						//if util.AddressCompareFromTo(observer.address, fromaddr, toaddr) {
+						if(observer.address == res.Message.From || observer.address == res.Message.To){
+							obj, err := r.NodeService.StateDecodeParams(msg.Message.Message.To, msg.Message.Message.Method, msg.Message.Message.Params)
+							if err == nil && obj != "" {
+								res.Message.Params = &obj
+							}
+
 							observer.update <- &res
 						}
 					}
 					r.mu.Unlock()
 				}
-				log.Printf("mpoolsub subscription stalled\n")
+				log.Printf("mpoolsub subscription -> stalled!\n")
 			}
 		}()
 	}
