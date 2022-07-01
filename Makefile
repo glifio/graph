@@ -1,9 +1,32 @@
-all: build push
+BINARY_NAME=graph
+mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
+mkfile_dir := $(dir $(mkfile_path))
+
+all: docker-build docker-push
 
 build:
+	go build -o ${BINARY_NAME} main.go
+
+run:
+	./${BINARY_NAME} daemon
+
+build_and_run: build run daemon
+
+protob:
+	protoc --go_out=. --go-grpc_out=.  pkg/daemon/daemon.proto
+	protoc --go_out=.  pkg/graph/data.proto
+
+generate:
+	go generate ./...
+
+clean:
+	go clean
+	rm ${BINARY_NAME}
+
+docker-build:
 	docker build --tag graph --tag "gcr.io/glif-292320/graph:$$(git rev-parse HEAD)" .
 
-push:
+docker-push:
 	docker push "gcr.io/glif-292320/graph:$$(git rev-parse HEAD)"
 
 namespace:
@@ -15,7 +38,7 @@ update-calibration-env:
 
 update-mainnet-env:
 	kubectl delete secret mainnet-graph-credentials -n glif
-	kubectl create secret generic mainnet-graph-credentials --from-env-file ./calibration.env -n glif
+	kubectl create secret generic mainnet-graph-credentials --from-env-file ./mainnet.env -n glif
 
 ingress:
 	cd ./k8s/base && kubectl apply -f ingress.yml -n glif

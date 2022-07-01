@@ -1,36 +1,66 @@
 package postgres
 
-// Db is our database struct used for interacting with the database
 import (
 	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
-
-	// postgres driver
+	"log"
+	"os"
+	"sync"
 
 	"github.com/go-pg/pg/v10"
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/spf13/viper"
 )
 
-type Database struct {
- 	Db 	*pg.DB
+var once sync.Once
+
+type DB struct {
+	pgx *pgxpool.Pool
 }
 
+// variabel Global
+var db *DB
+
+func GetInstanceDB() *DB {
+
+	once.Do(func() {
+		db = &DB{}
+
+		pgx, err := pgxpool.Connect(context.Background(), viper.GetViper().GetString("lily"))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Unable to connection to database: %v\n", err)
+			os.Exit(1)
+		}
+		log.Println("db -> connected")
+		db.pgx = pgx
+	})
+
+	return db
+}
+
+func (db *DB) Close() {
+	if db != nil {
+		db.pgx.Close()
+	}
+}
+
+// old stuff
+
+type Database struct {
+	Db *pg.DB
+}
 
 // New makes a new database using the connection string and
 // returns it, otherwise returns the error
-func (t *Database) New(host string, port int, user string, password string, dbName string, searchPath string) (error) {
-
-//	opt, _ := pg.ParseURL("postgresql://glif-jschwartz:fXvkDRg9Y2roYeehrh@read.lilium.sh:13573/mainnet")
-
-//	fmt.Print(opt.TLSConfig)
-
+func (t *Database) New(host string, port int, user string, password string, dbName string, searchPath string) error {
+	//	fmt.Print(opt.TLSConfig)
 	t.Db = pg.Connect(&pg.Options{
-		Addr: fmt.Sprintf("%s:%d", host, port),
-		User: user,
-		Password: password,
-		Database: dbName,
+		Addr:      fmt.Sprintf("%s:%d", host, port),
+		User:      user,
+		Password:  password,
+		Database:  dbName,
 		TLSConfig: &tls.Config{InsecureSkipVerify: true},
 		OnConnect: func(ctx context.Context, conn *pg.Conn) error {
 			_, err := conn.Exec("set search_path=?", searchPath)
@@ -40,10 +70,11 @@ func (t *Database) New(host string, port int, user string, password string, dbNa
 			return nil
 		},
 	})
+
 	//db, err := sql.Open("postgres", connString)
 
 	if t.Db == nil {
-		return  errors.New("no database connection")
+		return errors.New("no database connection")
 	}
 
 	// Check that our connection is good

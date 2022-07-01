@@ -11,9 +11,6 @@ type MessageItem struct {
 }
 
 type MessageInterface interface {
-//	Init() error
-//	Create(text string, isDone bool) (*string, error)
-//	Update(id string, text string, isDone bool) error
 	Get(id string) (*MessageItem, error)
 	List(limit int, offset int) ([]MessageItem, error)
 }

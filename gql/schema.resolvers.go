@@ -15,17 +15,65 @@ import (
 	"time"
 
 	"github.com/filecoin-project/lily/model/derived"
-	lotusapi "github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/specs-actors/v7/actors/builtin"
 	"github.com/filecoin-project/specs-actors/v7/actors/builtin/multisig"
 	"github.com/glifio/graph/gql/generated"
 	"github.com/glifio/graph/gql/model"
 	util "github.com/glifio/graph/internal/utils"
+	"github.com/glifio/graph/pkg/node"
 	"github.com/google/uuid"
 	gocid "github.com/ipfs/go-cid"
 	"github.com/jinzhu/copier"
 	"golang.org/x/crypto/blake2b"
 )
+
+func (r *messageResolver) To(ctx context.Context, obj *model.Message) (*model.Address, error) {
+	return r.NodeService.AddressLookup(obj.To)
+}
+
+func (r *messageResolver) From(ctx context.Context, obj *model.Message) (*model.Address, error) {
+	return r.NodeService.AddressLookup(obj.To)
+}
+
+func (r *messageResolver) GasCost(ctx context.Context, obj *model.Message) (*model.GasCost, error) {
+	_cid, _ := gocid.Decode(obj.Cid)
+
+	res, err := r.NodeService.StateReplay(ctx, types.EmptyTSK, _cid)
+	if err != nil {
+		return &model.GasCost{}, nil
+	}
+
+	gascost := model.GasCost{
+		GasUsed:            res.GasCost.GasUsed.Int64(),
+		BaseFeeBurn:        res.GasCost.BaseFeeBurn.String(),
+		Refund:             res.GasCost.Refund.String(),
+		MinerPenalty:       res.GasCost.MinerPenalty.String(),
+		MinerTip:           res.GasCost.MinerTip.String(),
+		OverEstimationBurn: res.GasCost.OverEstimationBurn.String(),
+		TotalCost:          res.GasCost.TotalCost.String(),
+	}
+
+	return &gascost, nil
+}
+
+func (r *messageResolver) Receipt(ctx context.Context, obj *model.Message) (*model.MessageReceipt, error) {
+	_cid, _ := gocid.Decode(obj.Cid)
+
+	res, err := r.NodeService.StateReplay(ctx, types.EmptyTSK, _cid)
+	if err != nil {
+		return &model.MessageReceipt{}, nil
+	}
+
+	receipt := model.MessageReceipt{
+		ExitCode: int64(res.MsgRct.ExitCode),
+		Return:   base64.StdEncoding.EncodeToString(res.MsgRct.Return),
+		GasUsed:  res.MsgRct.GasUsed,
+	}
+
+	return &receipt, nil
+}
 
 func (r *messageConfirmedResolver) From(ctx context.Context, obj *model.MessageConfirmed) (*model.Address, error) {
 	return r.NodeService.AddressLookup(obj.From)
@@ -86,23 +134,44 @@ func (r *queryResolver) Block(ctx context.Context, address string, height int64)
 	return &item, err
 }
 
-func (r *queryResolver) Message(ctx context.Context, cid string, height *int) (*model.MessageConfirmed, error) {
+func (r *queryResolver) Tipset(ctx context.Context, height uint64) (*model.TipSet, error) {
+	ts, err := node.GetTipSetByHeight(height)
+	if err != nil {
+		return nil, err
+	}
+
+	res := model.TipSet{
+		Height: uint64(ts.Height()),
+		Key:    ts.Key().String(),
+	}
+
+	for _, item := range ts.Cids() {
+		res.Cids = append(res.Cids, item.String())
+	}
+	for _, item := range ts.Blocks() {
+		res.Blks = append(res.Blks, &model.Block{Cid: item.Cid().String()})
+	}
+
+	return &res, err
+}
+
+func (r *queryResolver) Message(ctx context.Context, cid string, height *int) (*model.Message, error) {
 	limit := 1
 	offset := 0
 
 	msgCID, _ := gocid.Decode(cid)
-	maxheight, _ := r.MessageConfirmedService.GetMaxHeight()
+	maxheight := node.GetMaxHeight()
 
 	// Look in State
-	matchFunc := func(msg *lotusapi.InvocResult) bool {
+	matchFunc := func(msg *api.InvocResult) bool {
 		// match on both signed and unsigned cid
 		return msgCID.Equals(msg.MsgCid) || msgCID.Equals(msg.Msg.Cid())
 	}
 
-	r1, count, err := r.NodeService.SearchState(ctx, matchFunc, &limit, &offset, maxheight)
+	r1, count, err := r.NodeService.SearchState(ctx, matchFunc, &limit, &offset, int(maxheight))
 
 	if err == nil && count == 1 {
-		item := r1[0].ConfirmedMessage(r.NodeService.Node())
+		item := r1[0].CreateMessage()
 		log.Printf("message: found in state: %s\n", item.Cid)
 		return &item, nil
 	}
@@ -112,36 +181,21 @@ func (r *queryResolver) Message(ctx context.Context, cid string, height *int) (*
 		return nil, nil
 	}
 
-	// Look in Lily
-	msg, parsed, err := r.MessageConfirmedService.Get(cid, height)
-	if err != nil {
-		return nil, err
-	}
-
-	if msg == nil {
-		return nil, nil
-	}
-
-	var item model.MessageConfirmed
-	copier.Copy(&item, &msg)
-	if parsed != nil {
-		item.Params = &parsed.Params
-	}
-	
-	return &item, err
+	// Look in Badger
+	return node.GetMessage(cid)
 }
 
-func (r *queryResolver) Messages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessageConfirmed, error) {
-	var items []*model.MessageConfirmed
+func (r *queryResolver) Messages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.Message, error) {
+	var items []*model.Message
 
-	maxheight, _ := r.MessageConfirmedService.GetMaxHeight()
+	maxheight := node.GetMaxHeight()
 
-	var matchFunc func(msg *lotusapi.InvocResult) bool
+	var matchFunc func(msg *api.InvocResult) bool
 	var addr *model.Address
 	var err error
 
 	if address == nil {
-		matchFunc = func(msg *lotusapi.InvocResult) bool {
+		matchFunc = func(msg *api.InvocResult) bool {
 			return true
 		}
 	} else {
@@ -151,7 +205,7 @@ func (r *queryResolver) Messages(ctx context.Context, address *string, limit *in
 			return nil, err
 		}
 
-		matchFunc = func(msg *lotusapi.InvocResult) bool {
+		matchFunc = func(msg *api.InvocResult) bool {
 			if len(addr.ID) > 1 && (addr.ID[1:] == msg.Msg.From.String()[1:] || addr.ID[1:] == msg.Msg.To.String()[1:]) {
 				return true
 			}
@@ -162,11 +216,11 @@ func (r *queryResolver) Messages(ctx context.Context, address *string, limit *in
 		}
 	}
 
-	r1, count, err := r.NodeService.SearchState(ctx, matchFunc, limit, offset, maxheight)
+	r1, count, err := r.NodeService.SearchState(ctx, matchFunc, limit, offset, int(maxheight))
 	if err == nil {
 		for _, iter := range r1 {
-			item := iter.ConfirmedMessage(r.NodeService.Node())
-			items = append(items, &item)
+			val := iter.CreateMessage()
+			items = append(items, &val)
 		}
 	}
 
@@ -192,18 +246,19 @@ func (r *queryResolver) Messages(ctx context.Context, address *string, limit *in
 		lily_offset = *offset - count
 	}
 
-	r2, err := r.MessageConfirmedService.Search(addr, lily_limit, lily_offset)
-	if err != nil {
-		return nil, err
-	}
-	for _, r := range r2 {
-		var item model.MessageConfirmed
-		copier.Copy(&item, &r)
-		items = append(items, &item)
+	r2, err := node.SearchMessagesByAddress(ctx, addr.ID, &lily_limit, &lily_offset)
+	if err == nil {
+		items = append(items, r2...)
 	}
 
-	log.Printf("messages: found in lily: %d\n", len(r2))
+	log.Printf("messages: found in badger: %d\n", len(r2))
 	return items, nil
+}
+
+func (r *queryResolver) MessagesByHeight(ctx context.Context, height uint64, limit *int, offset *int) ([]*model.Message, error) {
+	r2, err := node.SearchMessagesByHeight(ctx, height, limit, offset)
+	log.Printf("messages: found in tipset: %d\n", len(r2))
+	return r2, err
 }
 
 func (r *queryResolver) PendingMessage(ctx context.Context, cid string) (*model.MessagePending, error) {
@@ -218,7 +273,7 @@ func (r *queryResolver) PendingMessage(ctx context.Context, cid string) (*model.
 			msg := model.CreatePendingMessage(&item.Message)
 			msg.Cid = item.Cid().String()
 
-			obj, err := r.NodeService.StateDecodeParams(item.Message.To, item.Message.Method, item.Message.Params)
+			obj, err := node.StateDecodeParams(item.Message.To, item.Message.Method, item.Message.Params)
 
 			if err == nil && obj != "" {
 				msg.Params = &obj
@@ -249,7 +304,7 @@ func (r *queryResolver) PendingMessages(ctx context.Context, address *string) ([
 			msg := model.CreatePendingMessage(&item.Message)
 			msg.Cid = item.Cid().String()
 
-			params, err := r.NodeService.StateDecodeParams(item.Message.To, item.Message.Method, item.Message.Params)
+			params, err := node.StateDecodeParams(item.Message.To, item.Message.Method, item.Message.Params)
 			if err == nil && params != "" {
 				msg.Params = &params
 			}
@@ -264,7 +319,7 @@ func (r *queryResolver) PendingMessages(ctx context.Context, address *string) ([
 				msg := model.CreatePendingMessage(&item.Message)
 				msg.Cid = item.Cid().String()
 
-				params, err := r.NodeService.StateDecodeParams(item.Message.To, item.Message.Method, item.Message.Params)
+				params, err := node.StateDecodeParams(item.Message.To, item.Message.Method, item.Message.Params)
 				if err == nil && params != "" {
 					msg.Params = &params
 				}
@@ -363,7 +418,7 @@ func (r *queryResolver) MsigPending(ctx context.Context, address string) ([]*mod
 		item.ID = iter.ID
 		item.Method = uint64(iter.Method)
 
-		obj, err := r.NodeService.StateDecodeParams(iter.To, iter.Method, iter.Params)
+		obj, err := node.StateDecodeParams(iter.To, iter.Method, iter.Params)
 
 		if err == nil && obj != "" {
 			item.Params = &obj
@@ -423,7 +478,7 @@ func (r *queryResolver) StateListMessages(ctx context.Context, address string, l
 		item.MinerPenalty = iter.GasCost.MinerPenalty.String()
 		item.MinerTip = iter.GasCost.MinerTip.String()
 
-		obj, err := r.NodeService.StateDecodeParams(iter.Msg.To, iter.Msg.Method, iter.Msg.Params)
+		obj, err := node.StateDecodeParams(iter.Msg.To, iter.Msg.Method, iter.Msg.Params)
 
 		if err == nil && obj != "" {
 			item.Params = &obj
@@ -477,7 +532,7 @@ func (r *queryResolver) MessageLowConfidence(ctx context.Context, cid string) (*
 		item.MinerPenalty = iter.GasCost.MinerPenalty.String()
 		item.MinerTip = iter.GasCost.MinerTip.String()
 
-		obj, err := r.NodeService.StateDecodeParams(iter.Msg.To, iter.Msg.Method, iter.Msg.Params)
+		obj, err := node.StateDecodeParams(iter.Msg.To, iter.Msg.Method, iter.Msg.Params)
 
 		if err == nil && obj != "" {
 			item.Params = &obj
@@ -612,14 +667,14 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 					res.Message.Method = msg.Message.Message.Method.String()
 
 					r.mu.Lock()
-					
+
 					for _, observer := range r.MpoolObserver.Observers {
-						if(msg.Message.Message.From.String() == observer.address){
+						if msg.Message.Message.From.String() == observer.address {
 							log.Printf("mpoolsub subscription -> from: %s %s\n", res.Message.From, res.Message.To)
 						}
 						//if util.AddressCompareFromTo(observer.address, fromaddr, toaddr) {
-						if(observer.address == res.Message.From || observer.address == res.Message.To){
-							obj, err := r.NodeService.StateDecodeParams(msg.Message.Message.To, msg.Message.Message.Method, msg.Message.Message.Params)
+						if observer.address == res.Message.From || observer.address == res.Message.To {
+							obj, err := node.StateDecodeParams(msg.Message.Message.To, msg.Message.Message.Method, msg.Message.Message.Params)
 							if err == nil && obj != "" {
 								res.Message.Params = &obj
 							}
@@ -657,6 +712,9 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 	return events, nil
 }
 
+// Message returns generated.MessageResolver implementation.
+func (r *Resolver) Message() generated.MessageResolver { return &messageResolver{r} }
+
 // MessageConfirmed returns generated.MessageConfirmedResolver implementation.
 func (r *Resolver) MessageConfirmed() generated.MessageConfirmedResolver {
 	return &messageConfirmedResolver{r}
@@ -673,6 +731,7 @@ func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
 // Subscription returns generated.SubscriptionResolver implementation.
 func (r *Resolver) Subscription() generated.SubscriptionResolver { return &subscriptionResolver{r} }
 
+type messageResolver struct{ *Resolver }
 type messageConfirmedResolver struct{ *Resolver }
 type messagePendingResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }

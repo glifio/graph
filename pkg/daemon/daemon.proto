@@ -1,0 +1,41 @@
+syntax = "proto3";
+package daemon;
+
+option go_package = "pkg/daemon";
+
+// The greeting service definition.
+service Daemon {
+    // Sends a greeting
+    rpc Sync (SyncRequest) returns (SyncReply) {}
+    rpc SyncLily (SyncRequest) returns (SyncReply) {}
+    rpc SyncValidate (SyncRequest) returns (SyncReply) {}
+
+    rpc KvDel (KvRequest) returns (KvReply) {}
+    rpc KvGet (KvRequest) returns (KvReply) {}
+    rpc KvMatch (KvRequest) returns (KvReply) {}
+}
+
+// The request message containing the user's name.
+message SyncRequest {
+    uint64 height = 1;
+    uint64 length = 2;
+}
+
+// The response message containing the greetings
+message SyncReply {
+    string message = 1;
+}
+
+// The request message containing the user's name.
+message KvRequest {
+    string key = 1;
+    string val = 2;
+    string operand = 3;
+    uint64 lenght = 4;
+    uint64 offset = 5;
+}
+
+// The response message containing the greetings
+message KvReply {
+    string message = 1;
+}
