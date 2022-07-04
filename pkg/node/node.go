@@ -7,7 +7,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/dgraph-io/ristretto"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
@@ -43,7 +42,7 @@ type Node struct {
 	//api1 api.FullNodeStruct
 	// closer jsonrpc.ClientCloser
 	// api    v0api.FullNodeStruct
-	cache *ristretto.Cache
+	// cache *ristretto.Cache
 	// db     postgres.Database
 	ticker *time.Ticker
 }
@@ -118,17 +117,6 @@ func (state *SearchStateStruct) CreateMessage() model.Message {
 	return item
 }
 
-func (t *Node) Init(cache *ristretto.Cache) error {
-	t.cache = cache
-	return nil
-}
-
-func (t *Node) Open() error {
-	kvdb.Open()
-	postgres.GetInstanceDB()
-	return nil
-}
-
 func (t *Node) Node() *Node {
 	return t
 }
@@ -197,7 +185,7 @@ func (t *Node) StateSearchMsg(id string) (*api.MsgLookup, error) {
 
 	var key = "node/state/search/" + id
 
-	value, found := t.cache.Get(key)
+	value, found := GetCacheInstance().cache.Get(key)
 	if found {
 		log.Println(key)
 		res := value.(api.MsgLookup)
@@ -212,7 +200,7 @@ func (t *Node) StateSearchMsg(id string) (*api.MsgLookup, error) {
 
 	// set cache
 	if msg != nil {
-		t.cache.SetWithTTL(key, *msg, 1, 5*time.Minute)
+		GetCacheInstance().cache.SetWithTTL(key, *msg, 1, 5*time.Minute)
 	}
 
 	return msg, err
@@ -254,7 +242,7 @@ func (t *Node) SearchState(ctx context.Context, match Match, limit *int, offset 
 	var err error
 
 	// get last tipsetkey from cache or default to chainhead
-	value, found := t.cache.Get("node/chainhead/tipsetkey")
+	value, found := GetCacheInstance().cache.Get("node/chainhead/tipsetkey")
 	if found {
 		tsk := value.(types.TipSetKey)
 		ts, err = t.ChainGetTipSet(ctx, tsk)
@@ -321,9 +309,9 @@ func (t *Node) SearchState(ctx context.Context, match Match, limit *int, offset 
 
 func (t *Node) ChainGetMessagesInTipset(p0 context.Context, p1 types.TipSetKey, p3 int) ([]*api.InvocResult, error) {
 	var key = "node/chain/tipset/messages/" + p1.String()
-
+	cache := GetCacheInstance().cache
 	// look in cache
-	value, found := t.cache.Get(key)
+	value, found := cache.Get(key)
 	if found {
 		res := value.([]*api.InvocResult)
 		return res, nil
@@ -394,24 +382,25 @@ func (t *Node) ChainGetMessagesInTipset(p0 context.Context, p1 types.TipSetKey, 
 					ID:     idaddr.String(),
 					Robust: roaddr.String(),
 				}
-				t.cache.SetWithTTL(addressLookupKey+idaddr.String(), modelAddr, 1, 60*time.Minute)
-				t.cache.SetWithTTL(addressLookupKey+roaddr.String(), modelAddr, 1, 60*time.Minute)
+				cache.SetWithTTL(addressLookupKey+idaddr.String(), modelAddr, 1, 60*time.Minute)
+				cache.SetWithTTL(addressLookupKey+roaddr.String(), modelAddr, 1, 60*time.Minute)
 			}
 		}
 	}
 
 	// add to cache
 	//log.Printf("cache -> tipset %d %s\n", p3, "done")
-	t.cache.SetWithTTL(key, res.Trace, 1, 60*time.Minute)
+	cache.SetWithTTL(key, res.Trace, 1, 60*time.Minute)
 
 	return res.Trace, err
 }
 
 func (t *Node) ChainGetTipSet(p0 context.Context, p1 types.TipSetKey) (*types.TipSet, error) {
 	var key = "node/chain/tipset/" + p1.String()
+	cache := GetCacheInstance().cache
 
 	// look in cache
-	value, found := t.cache.Get(key)
+	value, found := cache.Get(key)
 	if found {
 		res := value.(types.TipSet)
 		return &res, nil
@@ -424,7 +413,7 @@ func (t *Node) ChainGetTipSet(p0 context.Context, p1 types.TipSetKey) (*types.Ti
 	}
 
 	// add to cache
-	t.cache.SetWithTTL(key, *tipset, 1, 60*time.Minute)
+	cache.SetWithTTL(key, *tipset, 1, 60*time.Minute)
 
 	return tipset, err
 }
@@ -481,8 +470,9 @@ func (t *Node) StateListMessages(ctx context.Context, addr string, lookback int)
 
 func (t *Node) StateReplay(ctx context.Context, p1 types.TipSetKey, p2 cid.Cid) (*api.InvocResult, error) {
 	var key = "node/state/replay/" + p2.String()
+	cache := GetCacheInstance().cache
 
-	value, found := t.cache.Get(key)
+	value, found := cache.Get(key)
 	if found {
 		log.Printf("hit -> state replay cache: %s\n", key)
 		res := value.(api.InvocResult)
@@ -495,7 +485,7 @@ func (t *Node) StateReplay(ctx context.Context, p1 types.TipSetKey, p2 cid.Cid) 
 		return nil, err
 	}
 
-	t.cache.SetWithTTL(key, *res, 1, 5*time.Minute)
+	cache.SetWithTTL(key, *res, 1, 5*time.Minute)
 
 	return res, err
 }
@@ -551,8 +541,9 @@ func AddressConvert(id string) (*model.Address, error) {
 
 func (t *Node) AddressLookup(id string) (*model.Address, error) {
 	var key = addressLookupKey + id
+	cache := GetCacheInstance().cache
 
-	value, found := t.cache.Get(key)
+	value, found := cache.Get(key)
 	if found {
 		res := value.(model.Address)
 		return &res, nil
@@ -565,25 +556,31 @@ func (t *Node) AddressLookup(id string) (*model.Address, error) {
 		return nil, err
 	}
 
-	var rs address.Address
 	switch addr.Protocol() {
 	case address.ID:
-		//protocol = ID
 		result.ID = addr.String()
+		wb := kvdb.Open().Batch()
+		defer wb.Cancel()
+		robust, err := GetRobustAddress(context.Background(), addr, types.EmptyTSK, wb)
+		wb.Flush()
 		// rs, err = lotus.api.StateAccountKey(context.Background(), addr, types.EmptyTSK)
-		// if err == nil {
-		// 	result.Robust = rs.String()
-		// }
+		if err == nil {
+			result.Robust = robust.String()
+		}
 	default:
 		result.Robust = addr.String()
-		rs, err = lotus.api.StateLookupID(context.Background(), addr, types.EmptyTSK)
+		wb := kvdb.Open().Batch()
+		defer wb.Cancel()
+		id, err := GetIdAddress(context.Background(), addr, types.EmptyTSK, wb)
+		wb.Flush()
+		// rs, err = lotus.api.StateLookupID(context.Background(), addr, types.EmptyTSK)
 		if err == nil {
-			result.ID = rs.String()
+			result.ID = id.String()
 		}
 	}
 
 	if result.ID != "" && result.Robust != "" {
-		t.cache.SetWithTTL(key, *result, 1, 60*time.Minute)
+		cache.SetWithTTL(key, *result, 1, 60*time.Minute)
 	}
 
 	return result, nil

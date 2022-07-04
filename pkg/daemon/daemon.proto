@@ -7,6 +7,10 @@ option go_package = "pkg/daemon";
 service Daemon {
     // Sends a greeting
     rpc Sync (SyncRequest) returns (SyncReply) {}
+    rpc SyncTipset (SyncRequest) returns (SyncReply) {}
+    rpc SyncMessages (SyncRequest) returns (SyncReply) {}
+    rpc SyncAddress (SyncRequest) returns (SyncReply) {}
+    rpc SyncIndex (SyncRequest) returns (SyncReply) {}
     rpc SyncLily (SyncRequest) returns (SyncReply) {}
     rpc SyncValidate (SyncRequest) returns (SyncReply) {}
 
@@ -17,8 +21,13 @@ service Daemon {
 
 // The request message containing the user's name.
 message SyncRequest {
-    uint64 height = 1;
-    uint64 length = 2;
+    enum Action {
+        START = 0;
+        STOP = 1;
+      }
+    Action action = 1;
+    uint64 height = 2;
+    uint64 length = 3;
 }
 
 // The response message containing the greetings

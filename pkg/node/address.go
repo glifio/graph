@@ -3,7 +3,9 @@ package node
 import (
 	"context"
 	"log"
+	"time"
 
+	badger "github.com/dgraph-io/badger/v3"
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/glifio/graph/pkg/graph"
@@ -11,7 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func GetAddressFromID(ctx context.Context, id address.Address, tsk types.TipSetKey) (address.Address, error) {
+func GetRobustAddress(ctx context.Context, id address.Address, tsk types.TipSetKey, wb *badger.WriteBatch) (address.Address, error) {
 	if id.Protocol() != address.ID {
 		// already robust
 		return id, nil
@@ -24,7 +26,7 @@ func GetAddressFromID(ctx context.Context, id address.Address, tsk types.TipSetK
 	}
 
 	// see if we have the address in kv
-	val, err := kvdb.Open().Get([]byte("ir:" + id.String()))
+	val, err := kvdb.Open().Get([]byte("ia:" + id.String()))
 	if err == nil {
 		return DecodeAddress(val)
 	}
@@ -38,34 +40,53 @@ func GetAddressFromID(ctx context.Context, id address.Address, tsk types.TipSetK
 	log.Printf("address lookup: %s -> %s\n", id, res)
 
 	// save the address in kv
-	err = SetAddressFromID(id, res)
+	err = SetIdToAddress(id, res, wb)
 
 	return res, err
 }
 
-func GetIdAddress(ctx context.Context, addr address.Address, tsk types.TipSetKey) (address.Address, error) {
+func GetIdAddress(ctx context.Context, addr address.Address, tsk types.TipSetKey, wb *badger.WriteBatch) (address.Address, error) {
 	if addr.Protocol() == address.ID {
 		// already robust
 		return addr, nil
 	}
 
+	key := append([]byte("ai:"), addr.Payload()...)
+
+	value, found := GetCacheInstance().cache.Get(key)
+	if found {
+		return DecodeIdAddress(value.([]byte))
+	}
+
 	// see if we have the address in kv
-	val, err := kvdb.Open().Get(append([]byte("ai:"), addr.Payload()...))
+	val, err := kvdb.Open().Get(key)
 	if err == nil {
+		// set cache
+		GetCacheInstance().cache.SetWithTTL(key, val, 1, 60*time.Minute)
+
 		return DecodeIdAddress(val)
 	}
 
 	// lookup address in lotus
 	res, err := LookupIdAddress(ctx, addr, types.EmptyTSK)
 	if err != nil {
-		log.Printf("id lookup: %s -> %s\n", addr, err)
+		//log.Printf("id lookup: %s -> %s\n", addr, err)
 		return res, err
 	}
 
 	//log.Printf("id lookup: %s -> %s\n", addr, res)
 
 	// save the address in kv
-	err = SetAddressToID(addr, res)
+	err = SetAddressToId(addr, res, wb)
+	if err != nil {
+		log.Printf("id: %s\n", err)
+		return res, err
+	}
+	err = SetIdToAddress(addr, res, wb)
+	if err != nil {
+		log.Printf("id: %s\n", err)
+		return res, err
+	}
 
 	return res, err
 }
@@ -108,11 +129,11 @@ func LookupIdAddress(ctx context.Context, addr address.Address, tsk types.TipSet
 	return lotus.api.StateLookupID(ctx, addr, tsk)
 }
 
-func SetAddressFromID(id address.Address, robust address.Address) error {
+func SetIdToAddress(id address.Address, robust address.Address, wb *badger.WriteBatch) error {
 	db := kvdb.Open()
 
 	// key is ir:[id]
-	key := []byte("ir:" + id.String())
+	key := []byte("ia:" + id.String())
 
 	// encode address
 	a := &graph.Address{}
@@ -125,10 +146,10 @@ func SetAddressFromID(id address.Address, robust address.Address) error {
 	}
 
 	// store adddress
-	return db.SetNXs(key, val)
+	return db.SetNxWb(key, val, wb)
 }
 
-func SetAddressToID(robust address.Address, id address.Address) error {
+func SetAddressToId(robust address.Address, id address.Address, wb *badger.WriteBatch) error {
 	db := kvdb.Open()
 
 	// key is ai:[robust]
@@ -144,6 +165,9 @@ func SetAddressToID(robust address.Address, id address.Address) error {
 		return err
 	}
 
+	// set cache
+	GetCacheInstance().cache.SetWithTTL(key, val, 1, 60*time.Minute)
+
 	// store adddress
-	return db.SetNXs(key, val)
+	return db.SetNxWb(key, val, wb)
 }

@@ -16,7 +16,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func SetTipSet(ts *types.TipSet) error {
+func SetTipSet(ts *types.TipSet, wb *badger.WriteBatch) error {
 	db := kvdb.Open()
 	key := []byte("t:" + ts.Key().String())
 
@@ -27,13 +27,13 @@ func SetTipSet(ts *types.TipSet) error {
 	val := buf.Bytes()
 
 	// store tipset
-	if err := db.SetNX(key, val); err != nil {
+	if err := db.SetNxWb(key, val, wb); err != nil {
 		return err
 	}
 
 	// store reference to tipset height
 	keyHeight := "h:" + ts.Height().String()
-	return db.SetNX([]byte(keyHeight), []byte(ts.Key().String()))
+	return db.SetNxWb([]byte(keyHeight), []byte(ts.Key().String()), wb)
 }
 
 func GetTipSetByHeight(height uint64) (*types.TipSet, error) {
@@ -50,7 +50,7 @@ func GetTipSetByHeight(height uint64) (*types.TipSet, error) {
 		}
 
 		// add to badger
-		err = SetTipSet(ts)
+		// err = SetTipSet(ts)
 		return ts, err
 	}
 
@@ -80,7 +80,7 @@ func ExistsTipSet(tsk types.TipSetKey) bool {
 	return true
 }
 
-func GetTipSet(tsk types.TipSetKey) (*types.TipSet, error) {
+func GetTipSet(tsk types.TipSetKey, wb *badger.WriteBatch) (*types.TipSet, error) {
 	db := kvdb.Open()
 
 	ts := &types.TipSet{}
@@ -93,7 +93,7 @@ func GetTipSet(tsk types.TipSetKey) (*types.TipSet, error) {
 			return nil, err
 		}
 		// add to badger
-		SetTipSet(ts)
+		SetTipSet(ts, wb)
 	} else {
 		if err := ts.UnmarshalCBOR(bytes.NewReader(val)); err != nil {
 			return nil, err
@@ -102,7 +102,7 @@ func GetTipSet(tsk types.TipSetKey) (*types.TipSet, error) {
 	return ts, nil
 }
 
-func GetTipSetMessages(ts *types.TipSet) ([]api.Message, error) {
+func GetTipSetMessages(ts *types.TipSet, wb *badger.WriteBatch) ([]api.Message, error) {
 	db := kvdb.Open()
 	key := []byte(fmt.Sprintf("tm:%s", ts.Key()))
 
@@ -118,11 +118,11 @@ func GetTipSetMessages(ts *types.TipSet) ([]api.Message, error) {
 
 		// store messages
 		for _, msg := range tsm {
-			SetMessage(msg, ts)
+			SetMessage(msg, ts, wb)
 		}
 
 		// store list of tipset messages
-		SetTipSetMessages(ts.Key(), tsm)
+		SetTipSetMessages(ts.Key(), tsm, wb)
 
 		return tsm, err
 	}
@@ -136,7 +136,7 @@ func GetTipSetMessages(ts *types.TipSet) ([]api.Message, error) {
 	var msgs []api.Message
 	for _, c := range tpsmsgs.Cids {
 		cid, _ := gocid.Cast(c)
-		msg, err := GetLotusMessage(cid, ts)
+		msg, err := GetLotusMessage(cid, ts, wb)
 		if err != nil {
 			log.Printf("error tipset messages: %s\n", cid.String())
 		} else {
@@ -148,7 +148,34 @@ func GetTipSetMessages(ts *types.TipSet) ([]api.Message, error) {
 	return msgs, nil
 }
 
-func SetTipSetMessages(tsk types.TipSetKey, messages []api.Message) error {
+func UpdateTipSetMessages(ts *types.TipSet, wb *badger.WriteBatch) error {
+	db := kvdb.Open()
+	key := []byte(fmt.Sprintf("tm:%s", ts.Key()))
+
+	// get tipset messages
+	_, err := db.Get(key)
+	if err == badger.ErrKeyNotFound {
+		// get tipset from node
+		tsm, err := lotus.api.ChainGetMessagesInTipset(context.Background(), ts.Key())
+		if err != nil {
+			log.Printf("sync -> error: %s\n", err)
+			return err
+		}
+
+		// store messages
+		for _, msg := range tsm {
+			SetMessageNoIndex(msg, ts, wb)
+		}
+
+		// store list of tipset messages
+		err = SetTipSetMessages(ts.Key(), tsm, wb)
+
+		return err
+	}
+	return nil
+}
+
+func SetTipSetMessages(tsk types.TipSetKey, messages []api.Message, wb *badger.WriteBatch) error {
 	db := kvdb.Open()
 	key := []byte(fmt.Sprintf("tm:%s", tsk.String()))
 
@@ -164,5 +191,5 @@ func SetTipSetMessages(tsk types.TipSetKey, messages []api.Message) error {
 	if err != nil {
 		return err
 	}
-	return db.SetNX(key, val)
+	return db.SetNxWb(key, val, wb)
 }

@@ -3,12 +3,51 @@ package node
 import (
 	"context"
 	"log"
+	"sync"
 	"time"
 
+	"github.com/dgraph-io/ristretto"
 	lotusapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/spf13/viper"
 )
+
+var once1 sync.Once
+
+type Cache struct {
+	cache *ristretto.Cache
+}
+
+// variabel Global
+var cache *Cache
+
+func GetCacheInstance() *Cache {
+
+	once1.Do(func() {
+		ris, err := ristretto.NewCache(&ristretto.Config{
+			NumCounters: 1e7,     // number of keys to track frequency of (10M).
+			MaxCost:     1 << 30, // maximum cost of cache (1GB).
+			BufferItems: 64,      // number of keys per Get buffer.
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		cache = &Cache{
+			cache: ris,
+		}
+	})
+
+	return cache
+}
+
+func (c *Cache) Cache() *ristretto.Cache {
+	return c.cache
+}
+
+func (c *Cache) Close() {
+	c.cache.Close()
+}
 
 func (t *Node) StartCache() {
 	log.Println("cache -> init")
@@ -61,7 +100,7 @@ func cacheTipset(ctx context.Context, t *Node, elem *lotusapi.HeadChange) {
 	case <-time.After(2000 * time.Millisecond):
 		//log.Printf("cache -> tipset %s %s\n", elem.Val.Height(), elem.Type)
 		t.ChainGetMessagesInTipset(context.Background(), elem.Val.Key(), int(elem.Val.Height()))
-		t.cache.Set("node/chainhead/tipsetkey", elem.Val.Key(), 1)
+		GetCacheInstance().cache.Set("node/chainhead/tipsetkey", elem.Val.Key(), 1)
 	case <-ctx.Done():
 		// log.Printf("cache -> tipset %s %s\n", elem.Val.Height(), "halted")
 	}

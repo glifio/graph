@@ -1,6 +1,7 @@
 package kvdb
 
 import (
+	"errors"
 	"log"
 	"sync"
 
@@ -14,6 +15,7 @@ var once sync.Once
 type KvDB struct {
 	db  *badger.DB
 	txn *badger.Txn
+	wb  *badger.WriteBatch
 }
 
 // variabel Global
@@ -69,6 +71,25 @@ func (kv *KvDB) Multi() *badger.Txn {
 	return kv.txn
 }
 
+func (kv *KvDB) Batch() *badger.WriteBatch {
+	return kv.db.NewWriteBatch()
+}
+
+func (kv *KvDB) Flush() *badger.WriteBatch {
+	if kv.wb != nil {
+		kv.wb.Flush()
+	}
+	return kv.wb
+}
+
+func (kv *KvDB) Cancel() *badger.WriteBatch {
+	if kv.wb != nil {
+		kv.wb.Cancel()
+		kv.wb = nil
+	}
+	return kv.wb
+}
+
 func (kv *KvDB) Exec() error {
 	if kv.txn != nil {
 		err := kv.txn.Commit()
@@ -111,33 +132,54 @@ func (kv *KvDB) Del(key []byte) error {
 }
 
 func (kv *KvDB) Set(key []byte, val []byte) error {
-	txn := kv.txn
-
-	// If not multi then start a writable transaction.
-	if kv.txn == nil {
-		txn := kv.db.NewTransaction(true)
-		defer txn.Discard()
+	// Write batch
+	if kv.wb != nil {
+		//log.Printf("kv -> Set wb %s\n", string(key))
+		return kv.wb.Set(key, val)
 	}
 
-	// Use the transaction...
+	// Transaction
+	if kv.txn != nil {
+		//log.Printf("kv -> Set txn %s\n", string(key))
+		err := kv.txn.Set(key, val)
+
+		// If txn too big: commit, start a new txn and try again
+		if err == badger.ErrTxnTooBig {
+			log.Printf("kv -> txn too big\n")
+			kv.Exec()
+			kv.Multi()
+			return kv.txn.Set(key, val)
+		}
+
+		return err
+	}
+
+	txn := kv.db.NewTransaction(true)
+	defer txn.Discard()
+
 	err := txn.Set(key, val)
-
-	// If txn too big: commit, start a new txn and try again
-	if err == badger.ErrTxnTooBig {
-		kv.Exec()
-		kv.Multi()
-		return kv.Set(key, val)
-	}
 
 	if err != nil {
 		return err
 	}
 
-	// Commit the transaction if multi not started.
-	if kv.txn == nil {
-		err = txn.Commit()
+	return txn.Commit()
+}
+
+func (kv *KvDB) SetWb(key []byte, val []byte, wb *badger.WriteBatch) error {
+	// Write batch
+	if wb == nil {
+		return errors.New("error: write batch missing")
 	}
-	return err
+	return wb.Set(key, val)
+}
+
+func (kv *KvDB) SetTx(key []byte, val []byte, txn *badger.Txn) error {
+	// Transaction
+	if txn == nil {
+		return errors.New("error: transaction missing")
+	}
+	return txn.Set(key, val)
 }
 
 // Set key to hold string value if key does not exist.
@@ -145,11 +187,38 @@ func (kv *KvDB) Set(key []byte, val []byte) error {
 // holds a value, no operation is performed.
 // SETNX is short for "SET if Not eXists".
 func (kv *KvDB) SetNX(key []byte, val []byte) error {
+	return kv.db.View(func(txn *badger.Txn) error {
+		if _, err := txn.Get(key); err == badger.ErrKeyNotFound {
+			return kv.Set(key, val)
+		}
+		return nil
+	})
+}
+
+func (kv *KvDB) SetNxTx(key []byte, val []byte, txn *badger.Txn) error {
+	return kv.db.View(func(txn *badger.Txn) error {
+		if _, err := txn.Get(key); err == badger.ErrKeyNotFound {
+			return kv.Set(key, val)
+		}
+		return nil
+	})
+}
+
+func (kv *KvDB) SetNxWb(key []byte, val []byte, wb *badger.WriteBatch) error {
+	return kv.db.View(func(txn *badger.Txn) error {
+		_, err := txn.Get(key)
+		if err == badger.ErrKeyNotFound {
+			return kv.Set(key, val)
+		}
+		return err
+	})
+}
+
+func (kv *KvDB) SetNXs(key []byte, val []byte) error {
 	return kv.db.Update(func(txn *badger.Txn) error {
 		if _, err := txn.Get(key); err == badger.ErrKeyNotFound {
 			return txn.Set(key, val)
 		}
-		//		log.Printf("kv -> SetNX key found %s\n", string(key))
 		return nil
 	})
 }

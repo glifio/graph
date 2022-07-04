@@ -16,11 +16,11 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/lru"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
-	"github.com/dgraph-io/ristretto"
 	"github.com/getsentry/sentry-go"
 	graphql "github.com/glifio/graph/gql"
 	"github.com/glifio/graph/gql/generated"
 	pb "github.com/glifio/graph/pkg/daemon"
+	"github.com/glifio/graph/pkg/kvdb"
 	"github.com/glifio/graph/pkg/node"
 	"github.com/glifio/graph/pkg/postgres"
 	"github.com/go-chi/chi"
@@ -36,7 +36,7 @@ var nodeService *node.Node
 func init() {
 	rootCmd.AddCommand(daemonCmd)
 	daemonCmd.PersistentFlags().Bool("no-cache", false, "Don't start the cache")
-	daemonCmd.PersistentFlags().Bool("no-sync", false, "Don't start sync")
+	daemonCmd.PersistentFlags().Bool("sync", false, "Start sync")
 	daemonCmd.PersistentFlags().Bool("no-timer", false, "Don't start sync timer")
 }
 
@@ -63,29 +63,21 @@ var daemonCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		//config, _ := util.LoadConfig(".")
 		cacheDisabled, _ := cmd.Flags().GetBool("no-cache")
-		syncDisabled, _ := cmd.Flags().GetBool("no-sync")
+		syncEnabled, _ := cmd.Flags().GetBool("sync")
 		timerDisabled, _ := cmd.Flags().GetBool("no-timer")
 
-		log.Println("cache -> init")
-		log.Println("lily -> ", viper.GetString("lily"))
-		log.Println("lotus -> ", viper.GetString("lotus"))
-		log.Println("confidence -> ", viper.GetString("confidence"))
-		log.Println("sentry -> ", viper.GetString("sentry"))
-		cache, err := ristretto.NewCache(&ristretto.Config{
-			NumCounters: 1e7,     // number of keys to track frequency of (10M).
-			MaxCost:     1 << 30, // maximum cost of cache (1GB).
-			BufferItems: 64,      // number of keys per Get buffer.
-		})
-		if err != nil {
-			log.Fatal(err)
-		}
+		// log.Println("cache -> init")
+		// log.Println("lotus -> ", viper.GetString("lotus"))
+		// log.Println("confidence -> ", viper.GetString("confidence"))
+		// log.Println("sentry -> ", viper.GetString("sentry"))
 
-		cache.Clear()
+		cache := node.GetCacheInstance().Cache()
 
-		log.Println("start -> node service")
+		kvdb.Open()
+		postgres.GetInstanceDB()
+		node.GetCacheInstance()
+
 		nodeService = &node.Node{}
-		nodeService.Init(cache)
-		nodeService.Open()
 		network, _ := nodeService.Connect(viper.GetString("lotus"), viper.GetString("lotus_token"))
 		defer nodeService.Close()
 
@@ -100,7 +92,7 @@ var daemonCmd = &cobra.Command{
 			nodeService.StartCache()
 		}
 
-		if !syncDisabled {
+		if syncEnabled {
 			go node.Sync(context.Background(), uint64(viper.GetInt("confidence")), 0, 0)
 		}
 
@@ -108,7 +100,7 @@ var daemonCmd = &cobra.Command{
 			nodeService.SyncTimerStart(uint32(viper.GetInt("confidence")))
 		}
 
-		err = sentry.Init(sentry.ClientOptions{
+		err := sentry.Init(sentry.ClientOptions{
 			Dsn:         viper.GetString("sentry"),
 			Environment: string(network),
 			Debug:       true,
@@ -128,7 +120,7 @@ var daemonCmd = &cobra.Command{
 
 		s := grpc.NewServer()
 		pb.RegisterDaemonServer(s, &server{})
-		log.Printf("grpc server listening at %v", lis.Addr())
+		log.Printf("rpc server listening at %v", lis.Addr())
 		go func() {
 			if err := s.Serve(lis); err != nil {
 				log.Fatalf("failed to serve: %v", err)

@@ -34,7 +34,7 @@ func (r *messageResolver) To(ctx context.Context, obj *model.Message) (*model.Ad
 }
 
 func (r *messageResolver) From(ctx context.Context, obj *model.Message) (*model.Address, error) {
-	return r.NodeService.AddressLookup(obj.To)
+	return r.NodeService.AddressLookup(obj.From)
 }
 
 func (r *messageResolver) GasCost(ctx context.Context, obj *model.Message) (*model.GasCost, error) {

@@ -41,14 +41,11 @@ to quickly create a Cobra application.`,
 
 // Execute executes the root command.
 func Execute() error {
-	fmt.Println("execute")
 	return rootCmd.Execute()
 }
 
 func init() {
 	cobra.OnInitialize(initConfig)
-
-	fmt.Println("init")
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./graph.env)")
 	rootCmd.PersistentFlags().StringP("port", "p", "9090", "port number (default 9090)")
@@ -92,7 +89,7 @@ func init() {
 func initConfig() {
 	if cfgFile != "" {
 		// Use config file from the flag.
-		fmt.Printf("config file from the flag %s\n", cfgFile)
+		//fmt.Printf("config file from the flag %s\n", cfgFile)
 		viper.AddConfigPath(".")
 		viper.SetConfigName(cfgFile)
 		viper.SetConfigType("env")
@@ -109,13 +106,11 @@ func initConfig() {
 	viper.SetEnvPrefix(envPrefix)
 	viper.AutomaticEnv()
 
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
-	} else {
+	if err := viper.ReadInConfig(); err != nil {
 		fmt.Println(err)
 	}
 
-	for _, key := range viper.AllKeys() {
-		fmt.Println(key + " : " + viper.GetString(key))
-	}
+	// for _, key := range viper.AllKeys() {
+	// 	fmt.Println(key + " : " + viper.GetString(key))
+	// }
 }

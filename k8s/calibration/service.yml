@@ -16,6 +16,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: calibration-graph-service
+  annotations:
+    cloud.google.com/backend-config: '{"ports": {"80":"glif-backendconfig"}}'
 spec:
   selector:
     app: calibration-graph-deployment

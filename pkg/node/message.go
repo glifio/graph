@@ -8,17 +8,20 @@ import (
 	"log"
 	"math"
 
+	badger "github.com/dgraph-io/badger/v3"
+	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/glifio/graph/gql/model"
 	"github.com/glifio/graph/internal/ulid"
 	"github.com/glifio/graph/pkg/graph"
 	"github.com/glifio/graph/pkg/kvdb"
+	"github.com/ipfs/go-cid"
 	gocid "github.com/ipfs/go-cid"
 	"google.golang.org/protobuf/proto"
 )
 
-func GetLotusMessage(cid gocid.Cid, ts *types.TipSet) (*api.Message, error) {
+func GetLotusMessage(cid gocid.Cid, ts *types.TipSet, wb *badger.WriteBatch) (*api.Message, error) {
 	val, err := kvdb.Open().Get([]byte("cid:" + cid.String()))
 	if err != nil {
 		log.Printf("fetching missing message: %s\n", cid)
@@ -28,7 +31,7 @@ func GetLotusMessage(cid gocid.Cid, ts *types.TipSet) (*api.Message, error) {
 			return nil, err
 		}
 		msg := api.Message{Cid: cid, Message: res}
-		err = SetMessage(msg, ts)
+		err = SetMessage(msg, ts, wb)
 		return &msg, err
 	}
 
@@ -38,9 +41,6 @@ func GetLotusMessage(cid gocid.Cid, ts *types.TipSet) (*api.Message, error) {
 		return nil, err
 	}
 	msg.Cid = cid
-
-	// add search index
-	AddAddressToMessageIndex(context.Background(), msg, ts)
 
 	return msg, err
 }
@@ -77,7 +77,7 @@ func DecodeMessage(val []byte) (*model.Message, error) {
 		log.Fatalln("Failed to parse message:", err)
 		return nil, err
 	}
-	var msg types.Message
+	msg := types.Message{}
 	if err := msg.UnmarshalCBOR(bytes.NewReader(gmsg.MessageCbor)); err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func DecodeMessage(val []byte) (*model.Message, error) {
 	return &item, nil
 }
 
-func SetMessage(message api.Message, ts *types.TipSet) error {
+func SetMessage(message api.Message, ts *types.TipSet, wb *badger.WriteBatch) error {
 	db := kvdb.Open()
 
 	// key is cid:[cid]
@@ -102,13 +102,36 @@ func SetMessage(message api.Message, ts *types.TipSet) error {
 	}
 
 	// store message
-	err = db.SetNX(keyMsg, val)
+	err = db.SetNxWb(keyMsg, val, wb)
 	if err != nil {
 		return err
 	}
 
 	// add search index
-	AddAddressToMessageIndex(context.Background(), &message, ts)
+	AddAddressToMessageIndex(context.Background(), &message, ts, wb)
+
+	return err
+}
+
+func SetMessageNoIndex(message api.Message, ts *types.TipSet, wb *badger.WriteBatch) error {
+	db := kvdb.Open()
+
+	// key is cid:[cid]
+	keyMsg := []byte("cid:" + message.Cid.String())
+
+	// encode message
+	newMsg := &graph.Message{}
+	newMsg.CopyMessage(message.Message, uint64(ts.Height()))
+	val, err := proto.Marshal(newMsg)
+	if err != nil {
+		return err
+	}
+
+	// store message
+	err = db.SetNxWb(keyMsg, val, wb)
+	if err != nil {
+		return err
+	}
 
 	return err
 }
@@ -135,26 +158,24 @@ func generateULID(height uint64, message *types.Message) (ulid.ULID, error) {
 	return id, err
 }
 
-func AddAddressToMessageIndex(ctx context.Context, msg *api.Message, ts *types.TipSet) {
-	db := kvdb.Open()
-
+func AddAddressToMessageIndex(ctx context.Context, msg *api.Message, ts *types.TipSet, wb *badger.WriteBatch) {
 	// (a)ddr (m)essage (i)ndex  ami:[id]:[ulid]
+	ulid, _ := generateULID(uint64(ts.Height()), msg.Message)
 
-	id, _ := generateULID(uint64(ts.Height()), msg.Message)
-
-	to, err := GetIdAddress(ctx, msg.Message.To, ts.Key())
-	if err == nil {
-		keyTo := "ami:" + to.String() + ":" + id.String()
-		_ = db.SetNX([]byte(keyTo), []byte(msg.Cid.String()))
-	}
+	SetAddressIndex(ctx, msg.Message.To, ulid, msg.Cid, ts.Key(), wb)
 
 	// only save "from" reference if from != to
 	if msg.Message.From.String() != msg.Message.To.String() {
-		from, err := GetIdAddress(ctx, msg.Message.From, ts.Key())
-		if err != nil {
-			keyFrom := "ami:" + from.String() + ":" + id.String()
-			_ = db.SetNX([]byte(keyFrom), []byte(msg.Cid.String()))
-		}
+		SetAddressIndex(ctx, msg.Message.From, ulid, msg.Cid, ts.Key(), wb)
+	}
+}
+
+func SetAddressIndex(ctx context.Context, addr address.Address, ulid ulid.ULID, cid cid.Cid, tsk types.TipSetKey, wb *badger.WriteBatch) {
+	db := kvdb.Open()
+	id, err := GetIdAddress(ctx, addr, tsk, wb)
+	if err == nil {
+		key := "ami:" + id.String() + ":" + ulid.String()
+		_ = db.SetNxWb([]byte(key), []byte(cid.String()), wb)
 	}
 }
 

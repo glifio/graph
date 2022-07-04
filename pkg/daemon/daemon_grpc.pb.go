@@ -20,6 +20,10 @@ const _ = grpc.SupportPackageIsVersion7
 type DaemonClient interface {
 	// Sends a greeting
 	Sync(ctx context.Context, in *SyncRequest, opts ...grpc.CallOption) (*SyncReply, error)
+	SyncTipset(ctx context.Context, in *SyncRequest, opts ...grpc.CallOption) (*SyncReply, error)
+	SyncMessages(ctx context.Context, in *SyncRequest, opts ...grpc.CallOption) (*SyncReply, error)
+	SyncAddress(ctx context.Context, in *SyncRequest, opts ...grpc.CallOption) (*SyncReply, error)
+	SyncIndex(ctx context.Context, in *SyncRequest, opts ...grpc.CallOption) (*SyncReply, error)
 	SyncLily(ctx context.Context, in *SyncRequest, opts ...grpc.CallOption) (*SyncReply, error)
 	SyncValidate(ctx context.Context, in *SyncRequest, opts ...grpc.CallOption) (*SyncReply, error)
 	KvDel(ctx context.Context, in *KvRequest, opts ...grpc.CallOption) (*KvReply, error)
@@ -38,6 +42,42 @@ func NewDaemonClient(cc grpc.ClientConnInterface) DaemonClient {
 func (c *daemonClient) Sync(ctx context.Context, in *SyncRequest, opts ...grpc.CallOption) (*SyncReply, error) {
 	out := new(SyncReply)
 	err := c.cc.Invoke(ctx, "/daemon.Daemon/Sync", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonClient) SyncTipset(ctx context.Context, in *SyncRequest, opts ...grpc.CallOption) (*SyncReply, error) {
+	out := new(SyncReply)
+	err := c.cc.Invoke(ctx, "/daemon.Daemon/SyncTipset", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonClient) SyncMessages(ctx context.Context, in *SyncRequest, opts ...grpc.CallOption) (*SyncReply, error) {
+	out := new(SyncReply)
+	err := c.cc.Invoke(ctx, "/daemon.Daemon/SyncMessages", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonClient) SyncAddress(ctx context.Context, in *SyncRequest, opts ...grpc.CallOption) (*SyncReply, error) {
+	out := new(SyncReply)
+	err := c.cc.Invoke(ctx, "/daemon.Daemon/SyncAddress", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *daemonClient) SyncIndex(ctx context.Context, in *SyncRequest, opts ...grpc.CallOption) (*SyncReply, error) {
+	out := new(SyncReply)
+	err := c.cc.Invoke(ctx, "/daemon.Daemon/SyncIndex", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -95,6 +135,10 @@ func (c *daemonClient) KvMatch(ctx context.Context, in *KvRequest, opts ...grpc.
 type DaemonServer interface {
 	// Sends a greeting
 	Sync(context.Context, *SyncRequest) (*SyncReply, error)
+	SyncTipset(context.Context, *SyncRequest) (*SyncReply, error)
+	SyncMessages(context.Context, *SyncRequest) (*SyncReply, error)
+	SyncAddress(context.Context, *SyncRequest) (*SyncReply, error)
+	SyncIndex(context.Context, *SyncRequest) (*SyncReply, error)
 	SyncLily(context.Context, *SyncRequest) (*SyncReply, error)
 	SyncValidate(context.Context, *SyncRequest) (*SyncReply, error)
 	KvDel(context.Context, *KvRequest) (*KvReply, error)
@@ -109,6 +153,18 @@ type UnimplementedDaemonServer struct {
 
 func (UnimplementedDaemonServer) Sync(context.Context, *SyncRequest) (*SyncReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Sync not implemented")
+}
+func (UnimplementedDaemonServer) SyncTipset(context.Context, *SyncRequest) (*SyncReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SyncTipset not implemented")
+}
+func (UnimplementedDaemonServer) SyncMessages(context.Context, *SyncRequest) (*SyncReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SyncMessages not implemented")
+}
+func (UnimplementedDaemonServer) SyncAddress(context.Context, *SyncRequest) (*SyncReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SyncAddress not implemented")
+}
+func (UnimplementedDaemonServer) SyncIndex(context.Context, *SyncRequest) (*SyncReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SyncIndex not implemented")
 }
 func (UnimplementedDaemonServer) SyncLily(context.Context, *SyncRequest) (*SyncReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SyncLily not implemented")
@@ -152,6 +208,78 @@ func _Daemon_Sync_Handler(srv interface{}, ctx context.Context, dec func(interfa
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DaemonServer).Sync(ctx, req.(*SyncRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Daemon_SyncTipset_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServer).SyncTipset(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/daemon.Daemon/SyncTipset",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServer).SyncTipset(ctx, req.(*SyncRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Daemon_SyncMessages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServer).SyncMessages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/daemon.Daemon/SyncMessages",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServer).SyncMessages(ctx, req.(*SyncRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Daemon_SyncAddress_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServer).SyncAddress(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/daemon.Daemon/SyncAddress",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServer).SyncAddress(ctx, req.(*SyncRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Daemon_SyncIndex_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServer).SyncIndex(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/daemon.Daemon/SyncIndex",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServer).SyncIndex(ctx, req.(*SyncRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -256,6 +384,22 @@ var Daemon_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Sync",
 			Handler:    _Daemon_Sync_Handler,
+		},
+		{
+			MethodName: "SyncTipset",
+			Handler:    _Daemon_SyncTipset_Handler,
+		},
+		{
+			MethodName: "SyncMessages",
+			Handler:    _Daemon_SyncMessages_Handler,
+		},
+		{
+			MethodName: "SyncAddress",
+			Handler:    _Daemon_SyncAddress_Handler,
+		},
+		{
+			MethodName: "SyncIndex",
+			Handler:    _Daemon_SyncIndex_Handler,
 		},
 		{
 			MethodName: "SyncLily",
