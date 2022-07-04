@@ -7,12 +7,10 @@ scalar Uint64
 
 type Query {
   block(address: String!, height: Int64!): Block!
-  message(cid: String!, height: Int): MessageConfirmed
-  messages(
-    address: String
-    limit: Int = 10
-    offset: Int = 0
-  ): [MessageConfirmed]
+  tipset(height: Uint64!): TipSet
+  message(cid: String!, height: Int): Message
+  messages(address: String, limit: Int = 10, offset: Int = 0): [Message]
+  messagesByHeight(height: Uint64!, limit: Int = 10, offset: Int = 0): [Message]
   pendingMessage(cid: String!): MessagePending #mempool
   pendingMessages(address: String): [MessagePending!]! #mempool
   mpoolPending(address: String): [MpoolUpdate!]! #mempool
@@ -56,23 +54,42 @@ type MpoolUpdate {
 type TipSet {
   cids: [String!]
   blks: [Block!]
-  height: Uint64
+  height: Uint64!
+  key: String!
 }
 
 type Message {
   cid: String!
-  version: Uint64
-  to: String!
-  from: String!
-  nonce: Uint64
+  version: Uint64!
+  to: Address!
+  from: Address!
+  nonce: Uint64!
   #value(unit: FilUnit = AttoFil): Float!
   value: String!
-  gasLimit: Int64
-  gasFeeCap: String
-  gasPremium: String
+  gasLimit: Int64!
+  gasFeeCap: String!
+  gasPremium: String!
   method: String!
-  height: Float!
+  height: Uint64!
   params: String
+  gasCost: GasCost!
+  receipt: MessageReceipt!
+}
+
+type GasCost {
+  gasUsed: Int64!
+  baseFeeBurn: String!
+  overEstimationBurn: String!
+  minerPenalty: String!
+  minerTip: String!
+  refund: String!
+  totalCost: String!
+}
+
+type MessageReceipt {
+  exitCode: Int64!
+  return: String!
+  gasUsed: Int64!
 }
 
 type MessagePending {

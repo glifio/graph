@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1
-FROM golang:1.17.4-alpine AS build_base
+FROM golang:1.18-bullseye AS build_base
+# FROM golang:1.17.4-alpine AS build_base
 
 # Set the Current Working Directory inside the container
 WORKDIR /build
@@ -18,8 +19,17 @@ COPY . .
 RUN go build -o /build/giraph
 
 # Start fresh from a smaller image
-FROM alpine:3.15.0
-RUN apk add ca-certificates
+FROM debian:bullseye-slim
+# FROM alpine:3.15.0
+
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates
+
+RUN update-ca-certificates
+
+# RUN apt-get install -y ca-certificates
+#RUN apk add ca-certificates
 
 COPY --from=build_base /build/giraph /app/giraph
 

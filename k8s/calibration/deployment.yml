@@ -34,53 +34,29 @@ spec:
       containers:
         - name: calibration-graph-deployment
           image: gcr.io/PROJECT_ID/IMAGE:TAG
+          imagePullPolicy: "Always"
+          resources:
+            requests:
+              memory: "6Gi"
+            limits:
+              memory: "10Gi"
           env:
             - name: GRAPH_PORT
               valueFrom:
                 secretKeyRef:
                   name: calibration-graph-credentials
                   key: PORT
-            - name: GRAPH_DB_HOST
+            - name: LILY
               valueFrom:
                 secretKeyRef:
                   name: calibration-graph-credentials
-                  key: DB_HOST
-            - name: GRAPH_DB_PORT
+                  key: LILY
+            - name: LOTUS
               valueFrom:
                 secretKeyRef:
                   name: calibration-graph-credentials
-                  key: DB_PORT
-            - name: GRAPH_DB_USER
-              valueFrom:
-                secretKeyRef:
-                  name: calibration-graph-credentials
-                  key: DB_USER
-            - name: GRAPH_DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: calibration-graph-credentials
-                  key: DB_PASSWORD
-            - name: GRAPH_DB_DATABASE
-              valueFrom:
-                secretKeyRef:
-                  name: calibration-graph-credentials
-                  key: DB_DATABASE
-            - name: GRAPH_DB_SCHEMA
-              valueFrom:
-                secretKeyRef:
-                  name: calibration-graph-credentials
-                  key: DB_SCHEMA
-            - name: GRAPH_LOTUS_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: calibration-graph-credentials
-                  key: LOTUS_TOKEN
-            - name: GRAPH_LOTUS_ADDR
-              valueFrom:
-                secretKeyRef:
-                  name: calibration-graph-credentials
-                  key: LOTUS_ADDR
-            - name: GRAPH_CONFIDENCE
+                  key: LOTUS
+            - name: CONFIDENCE
               valueFrom:
                 secretKeyRef:
                   name: calibration-graph-credentials
@@ -99,3 +75,10 @@ spec:
               port: 9090
             initialDelaySeconds: 10
             periodSeconds: 10
+          volumeMounts:
+            - mountPath: /data
+              name: data-volume
+      volumes:
+        - name: data-volume
+          persistentVolumeClaim:
+            claimName: pvc-calibration-graph

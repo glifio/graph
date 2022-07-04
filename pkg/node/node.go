@@ -5,21 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"time"
 
-	"github.com/dgraph-io/ristretto"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-jsonrpc"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/lotus/api"
-	lotusapi "github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/fxamacker/cbor"
 	"github.com/glifio/graph/gql/model"
+	"github.com/glifio/graph/pkg/kvdb"
 	"github.com/glifio/graph/pkg/postgres"
 	"github.com/ipfs/go-cid"
 	"github.com/spf13/viper"
@@ -30,40 +26,40 @@ type NodeInterface interface {
 	GetActor(id string) (*types.Actor, error)
 	GetPending() ([]*types.SignedMessage, error)
 	GetMessage(cidcc string) (*types.Message, error)
-	StateSearchMsg(id string) (*lotusapi.MsgLookup, error)
+	StateSearchMsg(id string) (*api.MsgLookup, error)
 	AddressLookup(id string) (*model.Address, error)
-	MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error)
+	MsigGetPending(addr string) ([]*api.MsigTransaction, error)
 	SearchState(ctx context.Context, match Match, limit *int, offset *int, height int) ([]*SearchStateStruct, int, error)
-	StateListMessages(ctx context.Context, addr string, lookback int)([]*lotusapi.InvocResult, error)
-	StateDecodeParams(id address.Address, p2 abi.MethodNum, p3 []byte) (string, error)
-	StateReplay(ctx context.Context, p1 types.TipSetKey, p2 cid.Cid) (*lotusapi.InvocResult, error)
+	StateListMessages(ctx context.Context, addr string, lookback int) ([]*api.InvocResult, error)
+	StateReplay(ctx context.Context, p1 types.TipSetKey, p2 cid.Cid) (*api.InvocResult, error)
 
-	ChainHeadSub(ctx context.Context) (<-chan []*lotusapi.HeadChange, error)
-	MpoolSub(ctx context.Context) (<-chan lotusapi.MpoolUpdate, error)
+	ChainHeadSub(ctx context.Context) (<-chan []*api.HeadChange, error)
+	MpoolSub(ctx context.Context) (<-chan api.MpoolUpdate, error)
 	Node() *Node
 }
 
 type Node struct {
-	//api1 lotusapi.FullNodeStruct
-	closer jsonrpc.ClientCloser
-	api v0api.FullNodeStruct
-	cache *ristretto.Cache
-	db postgres.Database
+	//api1 api.FullNodeStruct
+	// closer jsonrpc.ClientCloser
+	// api    v0api.FullNodeStruct
+	// cache *ristretto.Cache
+	// db     postgres.Database
+	ticker *time.Ticker
 }
 
 type SearchStateStruct struct {
-	Tipset *types.TipSet
-	Message lotusapi.InvocResult
+	Tipset  *types.TipSet
+	Message api.InvocResult
 }
 
-func (state *SearchStateStruct) ConfirmedMessage(t *Node) model.MessageConfirmed {
+func (state *SearchStateStruct) ConfirmedMessage() model.MessageConfirmed {
 	var item model.MessageConfirmed
 
 	if state.Message.Msg != nil {
 		item.Cid = state.Message.MsgCid.String()
 		item.Height = int64(state.Tipset.Height())
 		item.Version = int(state.Message.Msg.Version)
-		item.From =  state.Message.Msg.From.String()
+		item.From = state.Message.Msg.From.String()
 		item.To = state.Message.Msg.To.String()
 		item.Nonce = state.Message.Msg.Nonce
 		item.Value = state.Message.Msg.Value.String()
@@ -83,7 +79,7 @@ func (state *SearchStateStruct) ConfirmedMessage(t *Node) model.MessageConfirmed
 	item.MinerTip = state.Message.GasCost.MinerTip.String()
 
 	//todo add tipsetkey
-	params, err := t.StateDecodeParams(state.Message.Msg.To, state.Message.Msg.Method, state.Message.Msg.Params)
+	params, err := StateDecodeParams(state.Message.Msg.To, state.Message.Msg.Method, state.Message.Msg.Params)
 
 	if err == nil && params != "" {
 		item.Params = &params
@@ -92,34 +88,43 @@ func (state *SearchStateStruct) ConfirmedMessage(t *Node) model.MessageConfirmed
 	return item
 }
 
-func (t *Node) Init(cache *ristretto.Cache, db postgres.Database) error {
-	t.cache = cache;
-	t.db = db;
-	return nil
+func (state *SearchStateStruct) CreateMessage() model.Message {
+	item := model.Message{}
+
+	if state.Message.Msg != nil {
+		item.Cid = state.Message.MsgCid.String()
+		item.Version = state.Message.Msg.Version
+		item.From = state.Message.Msg.From.String()
+		item.To = state.Message.Msg.To.String()
+		item.Nonce = state.Message.Msg.Nonce
+		item.Value = state.Message.Msg.Value.String()
+		item.GasLimit = state.Message.Msg.GasLimit
+		item.GasFeeCap = state.Message.Msg.GasFeeCap.String()
+		item.GasPremium = state.Message.Msg.GasPremium.String()
+		item.Method = state.Message.Msg.Method.String()
+	}
+
+	if state.Tipset != nil {
+		item.Height = uint64(state.Tipset.Height())
+	}
+
+	params, err := StateDecodeParams(state.Message.Msg.To, state.Message.Msg.Method, state.Message.Msg.Params)
+
+	if err == nil && params != "" {
+		item.Params = &params
+	}
+
+	return item
 }
 
 func (t *Node) Node() *Node {
 	return t
 }
 
-func (t *Node) Connect(address1 string, token string) (dtypes.NetworkName, error){
-	head := http.Header{}
+func (t *Node) Connect(address1 string, token string) (dtypes.NetworkName, error) {
+	lotus := GetLotusInstance(&LotusOptions{address: address1})
 
-	if token != "" {
-		head.Set("Authorization","Bearer " + token)
-	}
-	
-	var err error
-	t.closer, err = jsonrpc.NewMergeClient(context.Background(), 
-		address1, 
-		"Filecoin", 
-		api.GetInternalStructs(&t.api), 
-		head)
-	if err != nil {
-		log.Fatalf("connecting with lotus failed: %s", err)
-	}
-
-	name, _ := t.api.StateNetworkName(context.Background())
+	name, _ := lotus.api.StateNetworkName(context.Background())
 	fmt.Println("network name: ", name)
 	if name == "mainnet" {
 		address.CurrentNetwork = address.Mainnet
@@ -131,79 +136,24 @@ func (t *Node) Connect(address1 string, token string) (dtypes.NetworkName, error
 	return name, nil
 }
 
-func (t *Node) Close(){
-	t.closer()
-}
-
-func (t *Node) StartCache(maxheight int){
-	log.Println("cache -> init")
-	ctx, cancel := context.WithCancel(context.Background())
-
-	// listen for new chainhead
-	go func() {
-		for {
-			for {
-				log.Printf("cache -> subscribe to chainhead\n")
-				chain, err := t.api.ChainNotify(context.Background())
-
-				if err == nil {
-					for headchanges := range chain {
-						for _, elem := range headchanges {
-							switch elem.Type {
-							case "current":
-								fallthrough
-							case "apply":
-								ctx, cancel = context.WithCancel(context.Background())
-								go cacheTipset(ctx, t, elem)
-							case "revert":
-								// log.Printf("cache -> tipset %s %s\n", elem.Val.Height(), elem.Type)
-								cancel()
-							}
-						}
-					}
-				}
-				log.Printf("cache -> subscription failed: %s\n", err)
-				time.Sleep(15 * time.Second)
-			}
-		}
-	}()	
-
-	// backfill the cache
-	log.Printf("cache -> backfill\n")
-	ts, _ := t.api.ChainHead(context.Background())
-	for i:=0; i<viper.GetInt("confidence"); i++ {
-		if abi.ChainEpoch(maxheight) >= ts.Height() {
-			break;
-		}
-		go func(tipset types.TipSet, i int) {
-			log.Printf("cache -> backfill tipset %s %d\n", ts.Height(), i)
-			t.ChainGetMessagesInTipset(context.Background(), ts.Key(), i)
-		}(*ts, i)
-		ts, _ = t.ChainGetTipSet(context.Background(), ts.Parents())
+func (t *Node) Close() {
+	if lotus.closer != nil {
+		lotus.closer()
 	}
+	postgres.GetInstanceDB().Close()
+	kvdb.Open().Close()
+	t.SyncTimerStop()
 }
-
-func cacheTipset(ctx context.Context, t *Node, elem *lotusapi.HeadChange) {
-	select {
-	case <-time.After(2000 * time.Millisecond):
-		log.Printf("cache -> tipset %s %s\n", elem.Val.Height(), elem.Type)
-		t.ChainGetMessagesInTipset(context.Background(), elem.Val.Key(), int(elem.Val.Height()))
-		t.cache.Set("node/chainhead/tipsetkey", elem.Val.Key(), 1)
-	case <-ctx.Done():
-		// log.Printf("cache -> tipset %s %s\n", elem.Val.Height(), "halted")
-	}
-}
-
 
 func (t *Node) GetActor(id string) (*types.Actor, error) {
 	addr, err := address.NewFromString(id)
-	
+
 	if err != nil {
 		log.Println(err)
 		return nil, err
 	}
-	
-	actor, err := t.api.StateGetActor(context.Background(), addr, types.EmptyTSK )
+
+	actor, err := lotus.api.StateGetActor(context.Background(), addr, types.EmptyTSK)
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -217,8 +167,8 @@ func (t *Node) GetMessage(id string) (*types.Message, error) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	
-	msg, err := t.api.ChainGetMessage(context.Background(), c )
+
+	msg, err := lotus.api.ChainGetMessage(context.Background(), c)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -226,8 +176,8 @@ func (t *Node) GetMessage(id string) (*types.Message, error) {
 	return msg, nil
 }
 
-func (t *Node) StateSearchMsg(id string) (*lotusapi.MsgLookup, error){
-	c, err := cid.Decode(id)	
+func (t *Node) StateSearchMsg(id string) (*api.MsgLookup, error) {
+	c, err := cid.Decode(id)
 	if err != nil {
 		log.Print(err)
 		return nil, err
@@ -235,15 +185,14 @@ func (t *Node) StateSearchMsg(id string) (*lotusapi.MsgLookup, error){
 
 	var key = "node/state/search/" + id
 
-	value, found := t.cache.Get(key)
+	value, found := GetCacheInstance().cache.Get(key)
 	if found {
 		log.Println(key)
-		res := value.(lotusapi.MsgLookup)
+		res := value.(api.MsgLookup)
 		return &res, nil
 	}
 
-	confidence := viper.GetInt("confidence")
-	msg, err := t.api.StateSearchMsgLimited(context.Background(), c, abi.ChainEpoch(confidence))
+	msg, err := lotus.api.StateSearchMsg(context.Background(), types.EmptyTSK, c, api.LookbackNoLimit, true)
 	if err != nil {
 		log.Print(err)
 		return nil, err
@@ -251,18 +200,18 @@ func (t *Node) StateSearchMsg(id string) (*lotusapi.MsgLookup, error){
 
 	// set cache
 	if msg != nil {
-		t.cache.SetWithTTL(key, *msg, 1, 5*time.Minute)
+		GetCacheInstance().cache.SetWithTTL(key, *msg, 1, 5*time.Minute)
 	}
 
 	return msg, err
 }
 
-func (t *Node) StateDecodeParams(id address.Address, p2 abi.MethodNum, p3 []byte) (string, error){
+func StateDecodeParams(id address.Address, p2 abi.MethodNum, p3 []byte) (string, error) {
 	var res string
 	if p3 == nil {
 		return res, nil
 	}
-	obj, err := t.api.StateDecodeParams(context.Background(), id, p2, p3, types.EmptyTSK )
+	obj, err := lotus.api.StateDecodeParams(context.Background(), id, p2, p3, types.EmptyTSK)
 	if err != nil {
 		return res, err
 	}
@@ -275,18 +224,17 @@ func (t *Node) StateDecodeParams(id address.Address, p2 abi.MethodNum, p3 []byte
 	return res, err
 }
 
-func (t *Node) MsigGetPending(addr string) ([]*lotusapi.MsigTransaction, error) {
+func (t *Node) MsigGetPending(addr string) ([]*api.MsigTransaction, error) {
 	res, err := address.NewFromString(addr)
 	if err != nil {
 		return nil, err
 	}
-	
-	return t.api.MsigGetPending(context.Background(), res, types.EmptyTSK)
+
+	return lotus.api.MsigGetPending(context.Background(), res, types.EmptyTSK)
 }
 
 // match types take an *types.Message and return a bool value.
-type Match func(*lotusapi.InvocResult) bool
-
+type Match func(*api.InvocResult) bool
 
 func (t *Node) SearchState(ctx context.Context, match Match, limit *int, offset *int, height int) ([]*SearchStateStruct, int, error) {
 	// look in cache
@@ -294,17 +242,17 @@ func (t *Node) SearchState(ctx context.Context, match Match, limit *int, offset 
 	var err error
 
 	// get last tipsetkey from cache or default to chainhead
-	value, found := t.cache.Get("node/chainhead/tipsetkey")
+	value, found := GetCacheInstance().cache.Get("node/chainhead/tipsetkey")
 	if found {
 		tsk := value.(types.TipSetKey)
 		ts, err = t.ChainGetTipSet(ctx, tsk)
-		log.Println("cache: hit tipsetkey");
+		log.Println("cache: hit tipsetkey")
 		if err != nil {
-			ts, _ = t.api.ChainHead(ctx)
+			ts, _ = lotus.api.ChainHead(ctx)
 		}
 
 	} else {
-		ts, _ = t.api.ChainHead(ctx)
+		ts, _ = lotus.api.ChainHead(ctx)
 	}
 
 	var t1 []*SearchStateStruct
@@ -328,7 +276,7 @@ func (t *Node) SearchState(ctx context.Context, match Match, limit *int, offset 
 		if len(t1) >= *offset+*limit {
 			log.Printf("search state limit hit: %d dist:%d\n", ts.Height(), i)
 			break
-		}		
+		}
 
 		next, err := t.ChainGetTipSet(ctx, ts.Parents())
 		if err != nil {
@@ -348,29 +296,29 @@ func (t *Node) SearchState(ctx context.Context, match Match, limit *int, offset 
 	_count := len(t1)
 	var res []*SearchStateStruct
 
-	if(_offset > len(t1)){
+	if _offset > len(t1) {
 		return res, _count, nil
 	}
-	if(_offset + _limit > len(t1)){
-		_limit = len(t1)-_offset
+	if _offset+_limit > len(t1) {
+		_limit = len(t1) - _offset
 	}
 
-	res = t1[_offset:_offset+_limit]
+	res = t1[_offset : _offset+_limit]
 	return res, _count, nil
 }
 
-func (t *Node) ChainGetMessagesInTipset(p0 context.Context, p1 types.TipSetKey, p3 int) ([]*lotusapi.InvocResult, error) {
+func (t *Node) ChainGetMessagesInTipset(p0 context.Context, p1 types.TipSetKey, p3 int) ([]*api.InvocResult, error) {
 	var key = "node/chain/tipset/messages/" + p1.String()
-
+	cache := GetCacheInstance().cache
 	// look in cache
-	value, found := t.cache.Get(key)
+	value, found := cache.Get(key)
 	if found {
-		res := value.([]*lotusapi.InvocResult)
+		res := value.([]*api.InvocResult)
 		return res, nil
 	}
 
 	// get messages in tipset
-	msgs, err := t.api.ChainGetMessagesInTipset(p0, p1)
+	msgs, err := lotus.api.ChainGetMessagesInTipset(p0, p1)
 	if err != nil {
 		log.Printf("error tipset %s\n", err)
 		return nil, err
@@ -379,10 +327,10 @@ func (t *Node) ChainGetMessagesInTipset(p0 context.Context, p1 types.TipSetKey, 
 	// if we are close to chainhead don't run state compute
 	if p3 < 1 {
 		log.Printf("cache -> ignore t=%d\n", p3)
-		var tinvoc []*lotusapi.InvocResult
+		var tinvoc []*api.InvocResult
 		for _, iter := range msgs {
-			tmp := lotusapi.InvocResult{
-				Msg: iter.Message,
+			tmp := api.InvocResult{
+				Msg:    iter.Message,
 				MsgRct: nil,
 				MsgCid: iter.Cid,
 				GasCost: api.MsgGasCost{
@@ -407,73 +355,74 @@ func (t *Node) ChainGetMessagesInTipset(p0 context.Context, p1 types.TipSetKey, 
 		tmsg = append(tmsg, iter.Message)
 	}
 
-	res, err := t.api.StateCompute(p0, api.LookbackNoLimit, tmsg, p1)
+	res, err := lotus.api.StateCompute(p0, api.LookbackNoLimit, tmsg, p1)
 
 	if err != nil {
 		return nil, err
 	}
 
 	type ExecReturnBytes struct {
-		_ struct{} `cbor:",toarray"`
-		IDAddress []byte
+		_             struct{} `cbor:",toarray"`
+		IDAddress     []byte
 		RobustAddress []byte
-	 }
+	}
 
 	for _, iter := range res.Trace {
 		if iter.Msg.To.String()[1:] == "01" && iter.Msg.Method == 2 {
 			log.Println("found msg to 01....!", iter.MsgRct.ExitCode)
 			if iter.MsgRct.ExitCode.IsSuccess() {
-				var v ExecReturnBytes;
-				err := cbor.Unmarshal(iter.MsgRct.Return, &v);
+				var v ExecReturnBytes
+				err := cbor.Unmarshal(iter.MsgRct.Return, &v)
 				log.Println(err)
 				idaddr, _ := address.NewFromBytes(v.IDAddress)
 				roaddr, _ := address.NewFromBytes(v.RobustAddress)
 				log.Println(idaddr)
 				log.Println(roaddr)
 				modelAddr := model.Address{
-					ID: idaddr.String(),
+					ID:     idaddr.String(),
 					Robust: roaddr.String(),
 				}
-				t.cache.SetWithTTL(addressLookupKey+idaddr.String(), modelAddr, 1, 60*time.Minute)
-				t.cache.SetWithTTL(addressLookupKey+roaddr.String(), modelAddr, 1, 60*time.Minute)
-			}			
+				cache.SetWithTTL(addressLookupKey+idaddr.String(), modelAddr, 1, 60*time.Minute)
+				cache.SetWithTTL(addressLookupKey+roaddr.String(), modelAddr, 1, 60*time.Minute)
+			}
 		}
 	}
 
 	// add to cache
-	log.Printf("cache -> tipset %d %s\n", p3, "done")
-	t.cache.SetWithTTL(key, res.Trace, 1, 60*time.Minute)
+	//log.Printf("cache -> tipset %d %s\n", p3, "done")
+	cache.SetWithTTL(key, res.Trace, 1, 60*time.Minute)
 
 	return res.Trace, err
 }
 
-func (t *Node) ChainGetTipSet(p0 context.Context, p1 types.TipSetKey) (*types.TipSet, error){
+func (t *Node) ChainGetTipSet(p0 context.Context, p1 types.TipSetKey) (*types.TipSet, error) {
 	var key = "node/chain/tipset/" + p1.String()
+	cache := GetCacheInstance().cache
 
 	// look in cache
-	value, found := t.cache.Get(key)
+	value, found := cache.Get(key)
 	if found {
 		res := value.(types.TipSet)
 		return &res, nil
 	}
 
 	// get messages in tipset
-	tipset, err := t.api.ChainGetTipSet(p0, p1)
+	tipset, err := lotus.api.ChainGetTipSet(p0, p1)
 	if err != nil {
 		return nil, err
 	}
 
 	// add to cache
-	t.cache.SetWithTTL(key, *tipset, 1, 60*time.Minute)
+	cache.SetWithTTL(key, *tipset, 1, 60*time.Minute)
 
 	return tipset, err
 }
 
-func (t *Node) StateListMessages(ctx context.Context, addr string, lookback int)([]*lotusapi.InvocResult, error){
+func (t *Node) StateListMessages(ctx context.Context, addr string, lookback int) ([]*api.InvocResult, error) {
 	var out []cid.Cid
 	var res []cid.Cid
 
-	tipset, err := t.api.ChainHead(ctx)
+	tipset, err := lotus.api.ChainHead(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -484,29 +433,29 @@ func (t *Node) StateListMessages(ctx context.Context, addr string, lookback int)
 	id, _ := t.AddressGetID(addr)
 
 	if !id.Empty() {
-		res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{From: id}, types.EmptyTSK, tipset.Height()-abi.ChainEpoch(lookback))
+		res, err = lotus.api.StateListMessages(ctx, &api.MessageMatch{From: id}, types.EmptyTSK, tipset.Height()-abi.ChainEpoch(lookback))
 		if err == nil {
 			out = append(out, res...)
 		}
-		res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{To: id}, types.EmptyTSK, tipset.Height()-abi.ChainEpoch(lookback))
+		res, err = lotus.api.StateListMessages(ctx, &api.MessageMatch{To: id}, types.EmptyTSK, tipset.Height()-abi.ChainEpoch(lookback))
 		if err == nil {
 			out = append(out, res...)
 		}
 	}
 
 	if !robust.Empty() {
-		res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{From: robust}, types.EmptyTSK, tipset.Height()-abi.ChainEpoch(lookback))
+		res, err = lotus.api.StateListMessages(ctx, &api.MessageMatch{From: robust}, types.EmptyTSK, tipset.Height()-abi.ChainEpoch(lookback))
 		if err == nil {
 			out = append(out, res...)
 		}
 
-		res, err = t.api.StateListMessages(ctx, &lotusapi.MessageMatch{To: robust}, types.EmptyTSK, tipset.Height()-abi.ChainEpoch(lookback))
+		res, err = lotus.api.StateListMessages(ctx, &api.MessageMatch{To: robust}, types.EmptyTSK, tipset.Height()-abi.ChainEpoch(lookback))
 		if err == nil {
 			out = append(out, res...)
-		}	
+		}
 	}
 
-	var invoc []*lotusapi.InvocResult
+	var invoc []*api.InvocResult
 	for _, iter := range out {
 		replay, err := t.StateReplay(ctx, types.EmptyTSK, iter)
 		if err != nil {
@@ -516,52 +465,54 @@ func (t *Node) StateListMessages(ctx context.Context, addr string, lookback int)
 		}
 	}
 
-	return invoc, err 
+	return invoc, err
 }
 
-func (t *Node) StateReplay(ctx context.Context, p1 types.TipSetKey, p2 cid.Cid) (*lotusapi.InvocResult, error) {
+func (t *Node) StateReplay(ctx context.Context, p1 types.TipSetKey, p2 cid.Cid) (*api.InvocResult, error) {
 	var key = "node/state/replay/" + p2.String()
+	cache := GetCacheInstance().cache
 
-	value, found := t.cache.Get(key)
+	value, found := cache.Get(key)
 	if found {
 		log.Printf("hit -> state replay cache: %s\n", key)
-		res := value.(lotusapi.InvocResult)
+		res := value.(api.InvocResult)
 		return &res, nil
 	}
 
-	res, err := t.api.StateReplay(ctx, p1, p2)
+	res, err := lotus.api.StateReplay(ctx, p1, p2)
 	if err != nil {
+		log.Printf("state replay: %s\n", err)
 		return nil, err
 	}
 
-	t.cache.SetWithTTL(key, *res, 1, 5*time.Minute)
+	cache.SetWithTTL(key, *res, 1, 5*time.Minute)
 
 	return res, err
 }
 
 func (t *Node) ChainHead(ctx context.Context) (*types.TipSet, error) {
-	tipset, err := t.api.ChainHead(ctx)
+	tipset, err := lotus.api.ChainHead(ctx)
 	return tipset, err
 }
 
-func (t *Node) ChainHeadSub(ctx context.Context) (<-chan []*lotusapi.HeadChange, error) {
-	headchange, err := t.api.ChainNotify(ctx)
+func (t *Node) ChainHeadSub(ctx context.Context) (<-chan []*api.HeadChange, error) {
+	headchange, err := lotus.api.ChainNotify(ctx)
 	return headchange, err
 }
 
-func (t *Node) MpoolSub(ctx context.Context) (<-chan lotusapi.MpoolUpdate, error) {
-	mpool, err := t.api.MpoolSub(ctx)
+func (t *Node) MpoolSub(ctx context.Context) (<-chan api.MpoolUpdate, error) {
+	mpool, err := lotus.api.MpoolSub(ctx)
 	return mpool, err
 }
 
 func (t *Node) GetPending() ([]*types.SignedMessage, error) {
 
-	tipset, err := t.api.ChainHead(context.Background())
+	tipset, err := lotus.api.ChainHead(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	status, err := t.api.MpoolPending(context.Background(), tipset.Key())
+	status, err := lotus.api.MpoolPending(context.Background(), tipset.Key())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -571,10 +522,28 @@ func (t *Node) GetPending() ([]*types.SignedMessage, error) {
 
 const addressLookupKey = "node/addr/lookup/"
 
-func (t *Node) AddressLookup(id string) (*model.Address, error){
-	var key = addressLookupKey + id
+func AddressConvert(id string) (*model.Address, error) {
+	result := &model.Address{ID: "", Robust: ""}
 
-	value, found := t.cache.Get(key)
+	addr, err := address.NewFromString(id)
+	if err != nil {
+		return nil, err
+	}
+
+	switch addr.Protocol() {
+	case address.ID:
+		result.ID = addr.String()
+	default:
+		result.Robust = addr.String()
+	}
+	return result, nil
+}
+
+func (t *Node) AddressLookup(id string) (*model.Address, error) {
+	var key = addressLookupKey + id
+	cache := GetCacheInstance().cache
+
+	value, found := cache.Get(key)
 	if found {
 		res := value.(model.Address)
 		return &res, nil
@@ -584,76 +553,73 @@ func (t *Node) AddressLookup(id string) (*model.Address, error){
 	addr, err := address.NewFromString(id)
 	if err != nil {
 		log.Println(err)
-		return nil, err		
+		return nil, err
 	}
 
-	var rs address.Address
-	switch(addr.Protocol()){
-		case address.ID:
-			//protocol = ID
-			result.ID = addr.String()
-			rs, err = t.api.StateAccountKey(context.Background(), addr, types.EmptyTSK)
-			if err == nil {
-				result.Robust = rs.String()
-			} else {
-				// look in db
-				dbaddress := postgres.Address{};
-				dbaddress.Init(t.db);
-				addritem, err := dbaddress.SearchById(addr.String());
-				if err == nil && addritem != nil {
-					result.Robust = *addritem;
-				}				
-			}
-		default:
-			result.Robust = addr.String()
-			rs, err = t.api.StateLookupID(context.Background(), addr, types.EmptyTSK)
-			if err == nil {
-				result.ID = rs.String()
-			}
+	switch addr.Protocol() {
+	case address.ID:
+		result.ID = addr.String()
+		wb := kvdb.Open().Batch()
+		defer wb.Cancel()
+		robust, err := GetRobustAddress(context.Background(), addr, types.EmptyTSK, wb)
+		wb.Flush()
+		// rs, err = lotus.api.StateAccountKey(context.Background(), addr, types.EmptyTSK)
+		if err == nil {
+			result.Robust = robust.String()
+		}
+	default:
+		result.Robust = addr.String()
+		wb := kvdb.Open().Batch()
+		defer wb.Cancel()
+		id, err := GetIdAddress(context.Background(), addr, types.EmptyTSK, wb)
+		wb.Flush()
+		// rs, err = lotus.api.StateLookupID(context.Background(), addr, types.EmptyTSK)
+		if err == nil {
+			result.ID = id.String()
+		}
 	}
-
 
 	if result.ID != "" && result.Robust != "" {
-		t.cache.SetWithTTL(key, *result, 1, 60*time.Minute)
+		cache.SetWithTTL(key, *result, 1, 60*time.Minute)
 	}
 
 	return result, nil
 }
 
-func (t *Node) AddressGetID(id string) (address.Address, error){
+func (t *Node) AddressGetID(id string) (address.Address, error) {
 	addr, err := address.NewFromString(id)
 	if err != nil {
 		return addr, err
 	}
 	var rs address.Address
-	switch(addr.Protocol()){
-		case address.ID:
-			//protocol = ID
-			return addr, nil
-		default:
-			rs, err = t.api.StateLookupID(context.Background(), addr, types.EmptyTSK)
-			if err != nil {
-				return rs, err
-			}
-			return rs, nil
+	switch addr.Protocol() {
+	case address.ID:
+		//protocol = ID
+		return addr, nil
+	default:
+		rs, err = lotus.api.StateLookupID(context.Background(), addr, types.EmptyTSK)
+		if err != nil {
+			return rs, err
+		}
+		return rs, nil
 	}
 }
 
-func (t *Node) AddressGetRobust(id string) (address.Address, error){
+func (t *Node) AddressGetRobust(id string) (address.Address, error) {
 	addr, err := address.NewFromString(id)
 	if err != nil {
 		return addr, err
 	}
 	var rs address.Address
-	switch(addr.Protocol()){
-		case address.ID:
-			//protocol = ID
-			rs, err = t.api.StateAccountKey(context.Background(), addr, types.EmptyTSK)
-			if err != nil {
-				return rs, err
-			}
-			return rs, nil
-		default:
-			return addr, nil
+	switch addr.Protocol() {
+	case address.ID:
+		//protocol = ID
+		rs, err = lotus.api.StateAccountKey(context.Background(), addr, types.EmptyTSK)
+		if err != nil {
+			return rs, err
+		}
+		return rs, nil
+	default:
+		return addr, nil
 	}
 }

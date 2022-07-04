@@ -13,12 +13,12 @@ import (
 )
 
 type MessageConfirmed struct {
-	db 	Database
+	db    Database
 	cache *ristretto.Cache
 }
 
-func (t *MessageConfirmed) Init(db Database, cache *ristretto.Cache) error {
-	t.db = db;
+func (t *MessageConfirmed) Init(cache *ristretto.Cache) error {
+	//t.db = GetInstanceDB().pgx
 	t.cache = cache
 
 	// t.db.Db.AddQueryHook(pgdebug.DebugHook{
@@ -46,8 +46,8 @@ func (t *MessageConfirmed) GetMaxHeight() (int, error) {
 
 func (t *MessageConfirmed) Get(id string, height *int) (*lily.GasOutputs, *lily.ParsedMessage, error) {
 	// Select message
-    var msgs []lily.GasOutputs
-    var parsed_msgs []lily.ParsedMessage
+	var msgs []lily.GasOutputs
+	var parsed_msgs []lily.ParsedMessage
 	var err error = nil
 
 	if height != nil {
@@ -64,12 +64,12 @@ func (t *MessageConfirmed) Get(id string, height *int) (*lily.GasOutputs, *lily.
 	}
 
 	if len(msgs) == 0 {
-		return nil, nil, nil 
+		return nil, nil, nil
 	}
 
 	err = t.db.Db.Model(&parsed_msgs).
-	Where("parsed_message.cid = ? and parsed_message.height=?", msgs[0].Cid, msgs[0].Height).
-	Select()
+		Where("parsed_message.cid = ? and parsed_message.height=?", msgs[0].Cid, msgs[0].Height).
+		Select()
 	if err != nil {
 		return &msgs[0], nil, nil
 	}
@@ -78,8 +78,8 @@ func (t *MessageConfirmed) Get(id string, height *int) (*lily.GasOutputs, *lily.
 
 func (t *MessageConfirmed) List(address *string, limit *int, offset *int) ([]derived.GasOutputs, error) {
 	// Select messages
-    var msgs []derived.GasOutputs
-    var err = t.db.Db.Model(&msgs).
+	var msgs []derived.GasOutputs
+	var err = t.db.Db.Model(&msgs).
 		Where("gas_outputs.from = ?", *address).
 		WhereOr("gas_outputs.to = ?", *address).
 		Select()
@@ -96,13 +96,13 @@ func (t *MessageConfirmed) List(address *string, limit *int, offset *int) ([]der
 	_limit := *limit
 	_offset := *offset
 	var res []derived.GasOutputs
-	if(_offset > len(msgs)){
+	if _offset > len(msgs) {
 		return res, nil
 	}
-	if(_offset + _limit > len(msgs)){
-		_limit = len(msgs)-_offset
+	if _offset+_limit > len(msgs) {
+		_limit = len(msgs) - _offset
 	}
-    res = msgs[_offset:_offset+_limit]
+	res = msgs[_offset : _offset+_limit]
 
 	return res, nil
 }
@@ -118,7 +118,7 @@ func (t *MessageConfirmed) Search(address *model.Address, limit int, offset int)
 		var err = t.db.Db.Model(&msgs).
 			Where("gas_outputs.from = ?", address.ID).
 			WhereOr("gas_outputs.from = ?", address.Robust).
-			WhereOr("gas_outputs.to = ?", address.ID).		
+			WhereOr("gas_outputs.to = ?", address.ID).
 			WhereOr("gas_outputs.to = ?", address.Robust).
 			// Order("height desc").
 			// Limit(limit).
@@ -133,7 +133,7 @@ func (t *MessageConfirmed) Search(address *model.Address, limit int, offset int)
 		})
 
 		// set cache
-		t.cache.SetWithTTL("msg:confirm:search:" + address.Robust, msgs, 1, 1*time.Minute)
+		t.cache.SetWithTTL("msg:confirm:search:"+address.Robust, msgs, 1, 1*time.Minute)
 	}
 
 	// limit and offset
@@ -141,22 +141,22 @@ func (t *MessageConfirmed) Search(address *model.Address, limit int, offset int)
 	_offset := offset
 	var res []derived.GasOutputs
 
-	// no results 
+	// no results
 	if len(msgs) == 0 {
 		return res, nil
 	}
 
 	// offset bigger than results
-	if(_offset > len(msgs)){
+	if _offset > len(msgs) {
 		return res, nil
 	}
 
-	// partial results 
-	if(_offset + _limit > len(msgs)){
-		_limit = len(msgs)-_offset
+	// partial results
+	if _offset+_limit > len(msgs) {
+		_limit = len(msgs) - _offset
 	}
 
-    res = msgs[_offset:_offset+_limit]
+	res = msgs[_offset : _offset+_limit]
 
 	return res, nil
 }

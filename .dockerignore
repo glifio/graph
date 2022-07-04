@@ -1,0 +1,10 @@
+data*
+k8s
+*.env
+*.txt
+Makefile
+README.md
+graph
+Dockerfile
+docker-compose
+badger.bak

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -11,6 +12,7 @@ import (
 
 const (
 	// The name of our config file, without the file extension because viper supports many different config file languages.
+	//defaultConfigFilename = "mainnet"
 	defaultConfigFilename = "graph"
 
 	// The environment variable prefix of all environment variables bound to our command line flags.
@@ -20,10 +22,10 @@ const (
 
 var (
 	// Used for flags.
-	cfgFile     string
-	
+	cfgFile string
+
 	flag_address string // blob key
-	flag_method uint64 // blob raw data (or '-' for stdin)
+	flag_method  uint64 // blob raw data (or '-' for stdin)
 
 	rootCmd = &cobra.Command{
 		Use:   "graph",
@@ -31,43 +33,41 @@ var (
 		Long: `Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-		Run: func(cmd *cobra.Command, args []string) { 
-			fmt.Println("Port: " + viper.GetString("port")) 
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println("Port: " + viper.GetString("port"))
 		},
 	}
 )
 
 // Execute executes the root command.
 func Execute() error {
-	fmt.Println("execute")
 	return rootCmd.Execute()
 }
 
 func init() {
-	fmt.Println("init")
-
 	cobra.OnInitialize(initConfig)
 
-	// rootCmd.PersistentFlags().StringP("port", "p", "9111", "port number (default is 9111)")
-	// rootCmd.PersistentFlags().String("db-host", "", "port number (default is 9111)")
-	// rootCmd.PersistentFlags().String("db-port", "", "port number (default is 9111)")
-	// rootCmd.PersistentFlags().String("db-user", "", "port number (default is 9111)")
-	// rootCmd.PersistentFlags().String("db-password", "", "port number (default is 9111)")
-	// rootCmd.PersistentFlags().String("db-database", "", "port number (default is 9111)")
-	// rootCmd.PersistentFlags().String("lotus-token", "", "port number (default is 9111)")
-	// rootCmd.PersistentFlags().String("lotus-address", "", "port number (default is 9111)")
-	// viper.BindPFlag("port", rootCmd.PersistentFlags().Lookup("port"))
-	//viper.BindPFlag("db-host", rootCmd.PersistentFlags().Lookup("db-host"))
-	viper.BindEnv("port")
-	viper.BindEnv("db_host")
-	viper.BindEnv("db_port")
-	viper.BindEnv("db_user")
-	viper.BindEnv("db_password")
-	viper.BindEnv("db_database")
-	viper.BindEnv("db_schema")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./graph.env)")
+	rootCmd.PersistentFlags().StringP("port", "p", "9090", "port number (default 9090)")
+	rootCmd.PersistentFlags().String("path", "./data", "path to kv db")
+	rootCmd.PersistentFlags().Uint("rpc", 9091, "rpc port number (default 9091)")
+
+	viper.BindPFlag("port", rootCmd.PersistentFlags().Lookup("port"))
+	viper.BindPFlag("path", rootCmd.PersistentFlags().Lookup("path"))
+	viper.BindPFlag("rpc", rootCmd.PersistentFlags().Lookup("rpc"))
+
+	// viper.BindEnv("port")
+	// viper.BindEnv("db_host")
+	// viper.BindEnv("db_port")
+	// viper.BindEnv("db_user")
+	// viper.BindEnv("db_password")
+	// viper.BindEnv("db_database")
+	// viper.BindEnv("db_schema")
 	viper.BindEnv("lotus_token")
-	viper.BindEnv("lotus_addr")
-	viper.BindEnv("sentry_dns")
+	viper.BindEnv("lily")
+	viper.BindEnv("lotus")
+	viper.BindEnv("lotus_wss")
+	viper.BindEnv("sentry")
 	viper.BindEnv("confidence")
 
 	rootCmd.Flags().VisitAll(func(f *pflag.Flag) {
@@ -87,29 +87,30 @@ func init() {
 }
 
 func initConfig() {
-	fmt.Println("initConfig")
-	
 	if cfgFile != "" {
 		// Use config file from the flag.
-		fmt.Println("config file from the flag")
-		viper.SetConfigFile(cfgFile)
+		//fmt.Printf("config file from the flag %s\n", cfgFile)
+		viper.AddConfigPath(".")
+		viper.SetConfigName(cfgFile)
+		viper.SetConfigType("env")
 	} else {
 		viper.AddConfigPath(".")
-		viper.AddConfigPath("~/.graph")
+		home, err := os.UserHomeDir()
+		if err == nil {
+			viper.AddConfigPath(home)
+		}
 		viper.SetConfigName(defaultConfigFilename)
 		viper.SetConfigType("env")
 	}
 
 	viper.SetEnvPrefix(envPrefix)
 	viper.AutomaticEnv()
-	
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
-	}else{
+
+	if err := viper.ReadInConfig(); err != nil {
 		fmt.Println(err)
 	}
 
-	for _, key := range viper.AllKeys(){
-		fmt.Println(key + " : " + viper.GetString(key))
-	}  
+	// for _, key := range viper.AllKeys() {
+	// 	fmt.Println(key + " : " + viper.GetString(key))
+	// }
 }

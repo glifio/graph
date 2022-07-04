@@ -39,6 +39,22 @@ type ChainHead struct {
 	Height int64 `json:"height"`
 }
 
+type GasCost struct {
+	GasUsed            int64  `json:"gasUsed"`
+	BaseFeeBurn        string `json:"baseFeeBurn"`
+	OverEstimationBurn string `json:"overEstimationBurn"`
+	MinerPenalty       string `json:"minerPenalty"`
+	MinerTip           string `json:"minerTip"`
+	Refund             string `json:"refund"`
+	TotalCost          string `json:"totalCost"`
+}
+
+type MessageReceipt struct {
+	ExitCode int64  `json:"exitCode"`
+	Return   string `json:"return"`
+	GasUsed  int64  `json:"gasUsed"`
+}
+
 type MpoolUpdate struct {
 	Type    int             `json:"type"`
 	Message *MessagePending `json:"message"`
@@ -61,7 +77,8 @@ type QueryMessage struct {
 type TipSet struct {
 	Cids   []string `json:"cids"`
 	Blks   []*Block `json:"blks"`
-	Height *uint64  `json:"height"`
+	Height uint64   `json:"height"`
+	Key    string   `json:"key"`
 }
 
 type FilUnit string
