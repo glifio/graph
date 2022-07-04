@@ -20,6 +20,8 @@ type Query {
     offset: Int = 0
   ): [MessageConfirmed!]! # lily
   address(str: String!): Address
+  gascost(cid: String!): GasCost
+  receipt(cid: String!): MessageReceipt
   actor(address: String!): Actor
   actors: [Actor!]!
   msigPending(address: String!): [MsigTransaction!]!

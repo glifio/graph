@@ -363,6 +363,44 @@ func (r *queryResolver) Address(ctx context.Context, str string) (*model.Address
 	return addr, err
 }
 
+func (r *queryResolver) Gascost(ctx context.Context, cid string) (*model.GasCost, error) {
+	_cid, _ := gocid.Decode(cid)
+
+	res, err := r.NodeService.StateReplay(ctx, types.EmptyTSK, _cid)
+	if err != nil {
+		return &model.GasCost{}, nil
+	}
+
+	gascost := model.GasCost{
+		GasUsed:            res.GasCost.GasUsed.Int64(),
+		BaseFeeBurn:        res.GasCost.BaseFeeBurn.String(),
+		Refund:             res.GasCost.Refund.String(),
+		MinerPenalty:       res.GasCost.MinerPenalty.String(),
+		MinerTip:           res.GasCost.MinerTip.String(),
+		OverEstimationBurn: res.GasCost.OverEstimationBurn.String(),
+		TotalCost:          res.GasCost.TotalCost.String(),
+	}
+
+	return &gascost, nil
+}
+
+func (r *queryResolver) Receipt(ctx context.Context, cid string) (*model.MessageReceipt, error) {
+	_cid, _ := gocid.Decode(cid)
+
+	res, err := r.NodeService.StateReplay(ctx, types.EmptyTSK, _cid)
+	if err != nil {
+		return &model.MessageReceipt{}, nil
+	}
+
+	receipt := model.MessageReceipt{
+		ExitCode: int64(res.MsgRct.ExitCode),
+		Return:   base64.StdEncoding.EncodeToString(res.MsgRct.Return),
+		GasUsed:  res.MsgRct.GasUsed,
+	}
+
+	return &receipt, nil
+}
+
 func (r *queryResolver) Actor(ctx context.Context, address string) (*model.Actor, error) {
 	// TODO get this data from lily instead of the node
 	item, err := r.NodeService.GetActor(address)
