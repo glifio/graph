@@ -31,7 +31,8 @@ func GetInstanceDB() *DB {
 		pgx, err := pgxpool.Connect(context.Background(), viper.GetViper().GetString("lily"))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Unable to connection to database: %v\n", err)
-			os.Exit(1)
+			db.pgx = nil
+			return
 		}
 		log.Println("db -> connected")
 		db.pgx = pgx

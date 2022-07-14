@@ -6,6 +6,7 @@ scalar Int64
 scalar Uint64
 
 type Query {
+  status: Status!
   block(address: String!, height: Int64!): Block!
   tipset(height: Uint64!): TipSet
   message(cid: String!, height: Int): Message
@@ -33,6 +34,7 @@ type Subscription {
   messages: [Message!]
   chainHead: ChainHead!
   mpoolUpdate(address: String): MpoolUpdate!
+  status: Status!
 }
 
 # Units of height
@@ -46,6 +48,11 @@ enum FilUnit {
 
 type ChainHead {
   height: Int64!
+}
+
+type Status {
+  height: Uint64!
+  estimate: Int64!
 }
 
 type MpoolUpdate {

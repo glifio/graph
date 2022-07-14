@@ -93,7 +93,7 @@ var daemonCmd = &cobra.Command{
 		}
 
 		if syncEnabled {
-			go node.Sync(context.Background(), uint64(viper.GetInt("confidence")), 0, 0)
+			go node.SyncTipsetStart(context.Background(), uint64(viper.GetInt("confidence")), 0, 0)
 		}
 
 		if !timerDisabled {

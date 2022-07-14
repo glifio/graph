@@ -13,6 +13,7 @@ service Daemon {
     rpc SyncIndex (SyncRequest) returns (SyncReply) {}
     rpc SyncLily (SyncRequest) returns (SyncReply) {}
     rpc SyncValidate (SyncRequest) returns (SyncReply) {}
+    rpc ProfileMemory (ProfileRequest) returns (Reply) {}
 
     rpc KvDel (KvRequest) returns (KvReply) {}
     rpc KvGet (KvRequest) returns (KvReply) {}
@@ -46,5 +47,18 @@ message KvRequest {
 
 // The response message containing the greetings
 message KvReply {
+    string message = 1;
+}
+
+message ProfileRequest {
+    enum Action {
+        START = 0;
+        STOP = 1;
+      }
+    Action action = 1;
+}
+
+// The response message containing the greetings
+message Reply {
     string message = 1;
 }

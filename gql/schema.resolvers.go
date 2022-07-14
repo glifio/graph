@@ -30,11 +30,11 @@ import (
 )
 
 func (r *messageResolver) To(ctx context.Context, obj *model.Message) (*model.Address, error) {
-	return r.NodeService.AddressLookup(obj.To)
+	return node.AddressLookup(obj.To)
 }
 
 func (r *messageResolver) From(ctx context.Context, obj *model.Message) (*model.Address, error) {
-	return r.NodeService.AddressLookup(obj.From)
+	return node.AddressLookup(obj.From)
 }
 
 func (r *messageResolver) GasCost(ctx context.Context, obj *model.Message) (*model.GasCost, error) {
@@ -76,11 +76,11 @@ func (r *messageResolver) Receipt(ctx context.Context, obj *model.Message) (*mod
 }
 
 func (r *messageConfirmedResolver) From(ctx context.Context, obj *model.MessageConfirmed) (*model.Address, error) {
-	return r.NodeService.AddressLookup(obj.From)
+	return node.AddressLookup(obj.From)
 }
 
 func (r *messageConfirmedResolver) To(ctx context.Context, obj *model.MessageConfirmed) (*model.Address, error) {
-	return r.NodeService.AddressLookup(obj.To)
+	return node.AddressLookup(obj.To)
 }
 
 func (r *messageConfirmedResolver) MethodName(ctx context.Context, obj *model.MessageConfirmed) (string, error) {
@@ -117,11 +117,15 @@ func (r *messageConfirmedResolver) Block(ctx context.Context, obj *model.Message
 }
 
 func (r *messagePendingResolver) To(ctx context.Context, obj *model.MessagePending) (*model.Address, error) {
-	return r.NodeService.AddressLookup(obj.To)
+	return node.AddressLookup(obj.To)
 }
 
 func (r *messagePendingResolver) From(ctx context.Context, obj *model.MessagePending) (*model.Address, error) {
-	return r.NodeService.AddressLookup(obj.From)
+	return node.AddressLookup(obj.From)
+}
+
+func (r *queryResolver) Status(ctx context.Context) (*model.Status, error) {
+	return node.SyncStatus(), nil
 }
 
 func (r *queryResolver) Block(ctx context.Context, address string, height int64) (*model.Block, error) {
@@ -199,7 +203,7 @@ func (r *queryResolver) Messages(ctx context.Context, address *string, limit *in
 			return true
 		}
 	} else {
-		addr, err = r.NodeService.AddressLookup(*address)
+		addr, err = node.AddressLookup(*address)
 		if err != nil {
 			log.Printf("messages: address not found: %s\n", *address)
 			return nil, err
@@ -296,7 +300,7 @@ func (r *queryResolver) PendingMessages(ctx context.Context, address *string) ([
 
 	var queryAddress *model.Address
 	if address != nil {
-		queryAddress, _ = r.NodeService.AddressLookup(*address)
+		queryAddress, _ = node.AddressLookup(*address)
 	}
 
 	if address == nil {
@@ -341,7 +345,7 @@ func (r *queryResolver) MessagesConfirmed(ctx context.Context, address *string, 
 	var items []*model.MessageConfirmed
 	var rs []derived.GasOutputs
 
-	addr, err := r.NodeService.AddressLookup(*address)
+	addr, err := node.AddressLookup(*address)
 	if err != nil {
 		return nil, err
 	}
@@ -359,7 +363,7 @@ func (r *queryResolver) MessagesConfirmed(ctx context.Context, address *string, 
 }
 
 func (r *queryResolver) Address(ctx context.Context, str string) (*model.Address, error) {
-	addr, err := r.NodeService.AddressLookup(str)
+	addr, err := node.AddressLookup(str)
 	return addr, err
 }
 
@@ -466,11 +470,11 @@ func (r *queryResolver) MsigPending(ctx context.Context, address string) ([]*mod
 		calculatedHash, _ := multisig.ComputeProposalHash(txn, blake2b.Sum256)
 		item.ProposalHash = base64.StdEncoding.EncodeToString(calculatedHash)
 
-		toaddr, _ := r.NodeService.AddressLookup(iter.To.String())
+		toaddr, _ := node.AddressLookup(iter.To.String())
 		item.To = toaddr
 		item.Value = iter.Value.String()
 		for _, appr := range iter.Approved {
-			approvedaddr, err := r.NodeService.AddressLookup(appr.String())
+			approvedaddr, err := node.AddressLookup(appr.String())
 			if err == nil {
 				item.Approved = append(item.Approved, approvedaddr)
 			}
@@ -689,9 +693,9 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 					res.Message = &model.MessagePending{}
 					res.Message.Cid = msg.Message.Cid().String()
 					res.Message.Version = strconv.FormatUint(msg.Message.Message.Version, 10)
-					//fromaddr, _ := r.NodeService.AddressLookup(msg.Message.Message.From.String())
+					//fromaddr, _ := node.AddressLookup(msg.Message.Message.From.String())
 					res.Message.From = msg.Message.Message.From.String()
-					//toaddr, _ := r.NodeService.AddressLookup(msg.Message.Message.To.String())
+					//toaddr, _ := node.AddressLookup(msg.Message.Message.To.String())
 					res.Message.To = msg.Message.Message.To.String()
 					nonce := strconv.FormatUint(msg.Message.Message.Nonce, 10)
 					res.Message.Nonce = &nonce
@@ -748,6 +752,10 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 	r.mu.Unlock()
 
 	return events, nil
+}
+
+func (r *subscriptionResolver) Status(ctx context.Context) (<-chan *model.Status, error) {
+	return nil, nil
 }
 
 // Message returns generated.MessageResolver implementation.

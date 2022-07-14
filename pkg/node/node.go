@@ -27,7 +27,6 @@ type NodeInterface interface {
 	GetPending() ([]*types.SignedMessage, error)
 	GetMessage(cidcc string) (*types.Message, error)
 	StateSearchMsg(id string) (*api.MsgLookup, error)
-	AddressLookup(id string) (*model.Address, error)
 	MsigGetPending(addr string) ([]*api.MsigTransaction, error)
 	SearchState(ctx context.Context, match Match, limit *int, offset *int, height int) ([]*SearchStateStruct, int, error)
 	StateListMessages(ctx context.Context, addr string, lookback int) ([]*api.InvocResult, error)
@@ -539,7 +538,7 @@ func AddressConvert(id string) (*model.Address, error) {
 	return result, nil
 }
 
-func (t *Node) AddressLookup(id string) (*model.Address, error) {
+func AddressLookup(id string) (*model.Address, error) {
 	var key = addressLookupKey + id
 	cache := GetCacheInstance().cache
 
@@ -563,7 +562,6 @@ func (t *Node) AddressLookup(id string) (*model.Address, error) {
 		defer wb.Cancel()
 		robust, err := GetRobustAddress(context.Background(), addr, types.EmptyTSK, wb)
 		wb.Flush()
-		// rs, err = lotus.api.StateAccountKey(context.Background(), addr, types.EmptyTSK)
 		if err == nil {
 			result.Robust = robust.String()
 		}
@@ -573,7 +571,6 @@ func (t *Node) AddressLookup(id string) (*model.Address, error) {
 		defer wb.Cancel()
 		id, err := GetIdAddress(context.Background(), addr, types.EmptyTSK, wb)
 		wb.Flush()
-		// rs, err = lotus.api.StateLookupID(context.Background(), addr, types.EmptyTSK)
 		if err == nil {
 			result.ID = id.String()
 		}

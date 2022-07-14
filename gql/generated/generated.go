@@ -189,6 +189,7 @@ type ComplexityRoot struct {
 		PendingMessages      func(childComplexity int, address *string) int
 		Receipt              func(childComplexity int, cid string) int
 		StateListMessages    func(childComplexity int, address string, lookback *int) int
+		Status               func(childComplexity int) int
 		Tipset               func(childComplexity int, height uint64) int
 	}
 
@@ -196,10 +197,16 @@ type ComplexityRoot struct {
 		Messages func(childComplexity int) int
 	}
 
+	Status struct {
+		Estimate func(childComplexity int) int
+		Height   func(childComplexity int) int
+	}
+
 	Subscription struct {
 		ChainHead   func(childComplexity int) int
 		Messages    func(childComplexity int) int
 		MpoolUpdate func(childComplexity int, address *string) int
+		Status      func(childComplexity int) int
 	}
 
 	TipSet struct {
@@ -230,6 +237,7 @@ type MessagePendingResolver interface {
 	From(ctx context.Context, obj *model.MessagePending) (*model.Address, error)
 }
 type QueryResolver interface {
+	Status(ctx context.Context) (*model.Status, error)
 	Block(ctx context.Context, address string, height int64) (*model.Block, error)
 	Tipset(ctx context.Context, height uint64) (*model.TipSet, error)
 	Message(ctx context.Context, cid string, height *int) (*model.Message, error)
@@ -252,6 +260,7 @@ type SubscriptionResolver interface {
 	Messages(ctx context.Context) (<-chan []*model.Message, error)
 	ChainHead(ctx context.Context) (<-chan *model.ChainHead, error)
 	MpoolUpdate(ctx context.Context, address *string) (<-chan *model.MpoolUpdate, error)
+	Status(ctx context.Context) (<-chan *model.Status, error)
 }
 
 type executableSchema struct {
@@ -1105,6 +1114,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.StateListMessages(childComplexity, args["address"].(string), args["lookback"].(*int)), true
 
+	case "Query.status":
+		if e.complexity.Query.Status == nil {
+			break
+		}
+
+		return e.complexity.Query.Status(childComplexity), true
+
 	case "Query.tipset":
 		if e.complexity.Query.Tipset == nil {
 			break
@@ -1123,6 +1139,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.QueryMessage.Messages(childComplexity), true
+
+	case "Status.estimate":
+		if e.complexity.Status.Estimate == nil {
+			break
+		}
+
+		return e.complexity.Status.Estimate(childComplexity), true
+
+	case "Status.height":
+		if e.complexity.Status.Height == nil {
+			break
+		}
+
+		return e.complexity.Status.Height(childComplexity), true
 
 	case "Subscription.chainHead":
 		if e.complexity.Subscription.ChainHead == nil {
@@ -1149,6 +1179,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Subscription.MpoolUpdate(childComplexity, args["address"].(*string)), true
+
+	case "Subscription.status":
+		if e.complexity.Subscription.Status == nil {
+			break
+		}
+
+		return e.complexity.Subscription.Status(childComplexity), true
 
 	case "TipSet.blks":
 		if e.complexity.TipSet.Blks == nil {
@@ -1253,6 +1290,7 @@ scalar Int64
 scalar Uint64
 
 type Query {
+  status: Status!
   block(address: String!, height: Int64!): Block!
   tipset(height: Uint64!): TipSet
   message(cid: String!, height: Int): Message
@@ -1280,6 +1318,7 @@ type Subscription {
   messages: [Message!]
   chainHead: ChainHead!
   mpoolUpdate(address: String): MpoolUpdate!
+  status: Status!
 }
 
 # Units of height
@@ -1293,6 +1332,11 @@ enum FilUnit {
 
 type ChainHead {
   height: Int64!
+}
+
+type Status {
+  height: Uint64!
+  estimate: Int64!
 }
 
 type MpoolUpdate {
@@ -5033,6 +5077,41 @@ func (ec *executionContext) _MsigTransaction_proposalHash(ctx context.Context, f
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Query_status(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().Status(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.Status)
+	fc.Result = res
+	return ec.marshalNStatus2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐStatus(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Query_block(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -5816,6 +5895,76 @@ func (ec *executionContext) _QueryMessage_messages(ctx context.Context, field gr
 	return ec.marshalNMessage2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageᚄ(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Status_height(ctx context.Context, field graphql.CollectedField, obj *model.Status) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Status",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Height, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint64)
+	fc.Result = res
+	return ec.marshalNUint642uint64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Status_estimate(ctx context.Context, field graphql.CollectedField, obj *model.Status) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Status",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Estimate, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int64)
+	fc.Result = res
+	return ec.marshalNInt642int64(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Subscription_messages(ctx context.Context, field graphql.CollectedField) (ret func() graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -5950,6 +6099,51 @@ func (ec *executionContext) _Subscription_mpoolUpdate(ctx context.Context, field
 			graphql.MarshalString(field.Alias).MarshalGQL(w)
 			w.Write([]byte{':'})
 			ec.marshalNMpoolUpdate2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMpoolUpdate(ctx, field.Selections, res).MarshalGQL(w)
+			w.Write([]byte{'}'})
+		})
+	}
+}
+
+func (ec *executionContext) _Subscription_status(ctx context.Context, field graphql.CollectedField) (ret func() graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = nil
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Subscription().Status(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return nil
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return nil
+	}
+	return func() graphql.Marshaler {
+		res, ok := <-resTmp.(<-chan *model.Status)
+		if !ok {
+			return nil
+		}
+		return graphql.WriterFunc(func(w io.Writer) {
+			w.Write([]byte{'{'})
+			graphql.MarshalString(field.Alias).MarshalGQL(w)
+			w.Write([]byte{':'})
+			ec.marshalNStatus2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐStatus(ctx, field.Selections, res).MarshalGQL(w)
 			w.Write([]byte{'}'})
 		})
 	}
@@ -7990,6 +8184,20 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Query")
+		case "status":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_status(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
 		case "block":
 			field := field
 			out.Concurrently(i, func() (res graphql.Marshaler) {
@@ -8240,6 +8448,38 @@ func (ec *executionContext) _QueryMessage(ctx context.Context, sel ast.Selection
 	return out
 }
 
+var statusImplementors = []string{"Status"}
+
+func (ec *executionContext) _Status(ctx context.Context, sel ast.SelectionSet, obj *model.Status) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, statusImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Status")
+		case "height":
+			out.Values[i] = ec._Status_height(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "estimate":
+			out.Values[i] = ec._Status_estimate(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var subscriptionImplementors = []string{"Subscription"}
 
 func (ec *executionContext) _Subscription(ctx context.Context, sel ast.SelectionSet) func() graphql.Marshaler {
@@ -8259,6 +8499,8 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 		return ec._Subscription_chainHead(ctx, fields[0])
 	case "mpoolUpdate":
 		return ec._Subscription_mpoolUpdate(ctx, fields[0])
+	case "status":
+		return ec._Subscription_status(ctx, fields[0])
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}
@@ -9010,6 +9252,20 @@ func (ec *executionContext) marshalNMsigTransaction2ᚖgithubᚗcomᚋglifioᚋg
 		return graphql.Null
 	}
 	return ec._MsigTransaction(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNStatus2githubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐStatus(ctx context.Context, sel ast.SelectionSet, v model.Status) graphql.Marshaler {
+	return ec._Status(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNStatus2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐStatus(ctx context.Context, sel ast.SelectionSet, v *model.Status) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._Status(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v interface{}) (string, error) {

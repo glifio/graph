@@ -27,13 +27,14 @@ func SetTipSet(ts *types.TipSet, wb *badger.WriteBatch) error {
 	val := buf.Bytes()
 
 	// store tipset
-	if err := db.SetNxWb(key, val, wb); err != nil {
+	if _, err := db.SetNxWb(key, val, wb); err != nil {
 		return err
 	}
 
 	// store reference to tipset height
 	keyHeight := "h:" + ts.Height().String()
-	return db.SetNxWb([]byte(keyHeight), []byte(ts.Key().String()), wb)
+	_, err := db.SetNxWb([]byte(keyHeight), []byte(ts.Key().String()), wb)
+	return err
 }
 
 func GetTipSetByHeight(height uint64) (*types.TipSet, error) {
@@ -115,7 +116,6 @@ func GetTipSetMessages(ts *types.TipSet, wb *badger.WriteBatch) ([]api.Message, 
 			log.Printf("sync -> error: %s\n", err)
 			return nil, err
 		}
-
 		// store messages
 		for _, msg := range tsm {
 			SetMessage(msg, ts, wb)
@@ -148,34 +148,31 @@ func GetTipSetMessages(ts *types.TipSet, wb *badger.WriteBatch) ([]api.Message, 
 	return msgs, nil
 }
 
-func UpdateTipSetMessages(ts *types.TipSet, wb *badger.WriteBatch) error {
+func UpdateTipSetMessages(ts *types.TipSet, wb *badger.WriteBatch) (bool, error) {
 	db := kvdb.Open()
 	key := []byte(fmt.Sprintf("tm:%s", ts.Key()))
 
 	// get tipset messages
-	_, err := db.Get(key)
-	if err == badger.ErrKeyNotFound {
+	if !db.Exists(key) {
 		// get tipset from node
 		tsm, err := lotus.api.ChainGetMessagesInTipset(context.Background(), ts.Key())
 		if err != nil {
 			log.Printf("sync -> error: %s\n", err)
-			return err
+			return false, err
 		}
 
 		// store messages
 		for _, msg := range tsm {
-			SetMessageNoIndex(msg, ts, wb)
+			SetMessage(msg, ts, wb)
 		}
 
 		// store list of tipset messages
-		err = SetTipSetMessages(ts.Key(), tsm, wb)
-
-		return err
+		return SetTipSetMessages(ts.Key(), tsm, wb)
 	}
-	return nil
+	return false, nil
 }
 
-func SetTipSetMessages(tsk types.TipSetKey, messages []api.Message, wb *badger.WriteBatch) error {
+func SetTipSetMessages(tsk types.TipSetKey, messages []api.Message, wb *badger.WriteBatch) (bool, error) {
 	db := kvdb.Open()
 	key := []byte(fmt.Sprintf("tm:%s", tsk.String()))
 
@@ -189,7 +186,7 @@ func SetTipSetMessages(tsk types.TipSetKey, messages []api.Message, wb *badger.W
 	tm := &graph.TipsetMessages{Cids: cids}
 	val, err := proto.Marshal(tm)
 	if err != nil {
-		return err
+		return false, err
 	}
 	return db.SetNxWb(key, val, wb)
 }

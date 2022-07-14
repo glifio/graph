@@ -17,16 +17,13 @@ import (
 
 func init() {
 	rootCmd.AddCommand(syncCmd)
-	syncCmd.AddCommand(syncTipSetCmd)
-	syncTipSetCmd.AddCommand(syncTipSetStopCmd)
-	syncCmd.AddCommand(syncMessageCmd)
-	syncCmd.AddCommand(syncLilyCmd)
+	syncCmd.AddCommand(syncStopCmd)
 	syncCmd.AddCommand(syncValidateCmd)
 	syncCmd.PersistentFlags().Uint64("height", 0, "Tipset height to start sync desc from")
 	syncCmd.PersistentFlags().Uint64("length", 0, "Number of Tipsets")
 }
 
-var syncCmd = &cobra.Command{
+var syncCmdxx = &cobra.Command{
 	Use:   "sync",
 	Short: "Sync tipsets from lotus node",
 	Long:  `Sync tipset data`,
@@ -53,36 +50,10 @@ var syncCmd = &cobra.Command{
 	},
 }
 
-var syncLilyCmd = &cobra.Command{
-	Use:   "lily",
-	Short: "Sync tipsets from lily database",
-	Long:  `Sync lily tipset data`,
-	Run: func(cmd *cobra.Command, args []string) {
-		height, _ := cmd.Flags().GetUint64("height")
-		length, _ := cmd.Flags().GetUint64("length")
-
-		conn, err := grpc.Dial(fmt.Sprintf("localhost:%d", viper.GetViper().GetUint("rpc")), grpc.WithTransportCredentials(insecure.NewCredentials()))
-		if err != nil {
-			log.Fatalf("did not connect: %v", err)
-		}
-		defer conn.Close()
-		c := pb.NewDaemonClient(conn)
-
-		// Contact the server and print out its response.
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-		r, err := c.SyncLily(ctx, &pb.SyncRequest{Height: height, Length: length})
-		if err != nil {
-			log.Fatalf("could not sync: %v", err)
-		}
-		log.Printf("Sync Lily: %s", r.GetMessage())
-	},
-}
-
-var syncTipSetCmd = &cobra.Command{
-	Use:   "tipset",
+var syncCmd = &cobra.Command{
+	Use:   "sync",
 	Short: "Sync tipset data",
-	Long:  `Fetch all tipsets from lotus node`,
+	Long:  `Fetch all tipsets from lotus node top down`,
 	Run: func(cmd *cobra.Command, args []string) {
 		height, _ := cmd.Flags().GetUint64("height")
 		length, _ := cmd.Flags().GetUint64("length")
@@ -109,7 +80,7 @@ func RpcDial() (pb.DaemonClient, *grpc.ClientConn) {
 	return pb.NewDaemonClient(conn), conn
 }
 
-var syncTipSetStopCmd = &cobra.Command{
+var syncStopCmd = &cobra.Command{
 	Use:   "stop",
 	Short: "Sync stop",
 	Run: func(cmd *cobra.Command, args []string) {
@@ -124,32 +95,6 @@ var syncTipSetStopCmd = &cobra.Command{
 			fmt.Println(err)
 		}
 		fmt.Println(r.GetMessage())
-	},
-}
-
-var syncMessageCmd = &cobra.Command{
-	Use:   "messages",
-	Short: "Sync message data",
-	Long:  `Fetch all messages from lotus node`,
-	Run: func(cmd *cobra.Command, args []string) {
-		height, _ := cmd.Flags().GetUint64("height")
-		length, _ := cmd.Flags().GetUint64("length")
-
-		conn, err := grpc.Dial(fmt.Sprintf("localhost:%d", viper.GetViper().GetUint("rpc")), grpc.WithTransportCredentials(insecure.NewCredentials()))
-		if err != nil {
-			log.Fatalf("did not connect: %v", err)
-		}
-		defer conn.Close()
-		c := pb.NewDaemonClient(conn)
-
-		// Contact the server and print out its response.
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		r, err := c.SyncMessages(ctx, &pb.SyncRequest{Height: height, Length: length})
-		if err != nil {
-			log.Fatalf("could not sync: %v", err)
-		}
-		log.Printf("Sync messages: %s", r.GetMessage())
 	},
 }
 
@@ -198,8 +143,8 @@ func (s *server) SyncTipset(ctx context.Context, in *pb.SyncRequest) (*pb.SyncRe
 	switch in.Action {
 	case pb.SyncRequest_START:
 		if ctxCancel == nil {
-			ctxTipset, ctxCancel = context.WithCancel(ctx)
-			go node.SyncTipset(ctxTipset, 50, in.Height, in.Length)
+			ctxTipset, ctxCancel = context.WithCancel(context.Background())
+			go node.SyncTipsetStart(ctxTipset, 50, in.Height, in.Length)
 			str = fmt.Sprintf("Sync started desc from: %d", height)
 		} else {
 			str = "Sync already started"

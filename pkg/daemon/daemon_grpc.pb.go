@@ -26,6 +26,7 @@ type DaemonClient interface {
 	SyncIndex(ctx context.Context, in *SyncRequest, opts ...grpc.CallOption) (*SyncReply, error)
 	SyncLily(ctx context.Context, in *SyncRequest, opts ...grpc.CallOption) (*SyncReply, error)
 	SyncValidate(ctx context.Context, in *SyncRequest, opts ...grpc.CallOption) (*SyncReply, error)
+	ProfileMemory(ctx context.Context, in *ProfileRequest, opts ...grpc.CallOption) (*Reply, error)
 	KvDel(ctx context.Context, in *KvRequest, opts ...grpc.CallOption) (*KvReply, error)
 	KvGet(ctx context.Context, in *KvRequest, opts ...grpc.CallOption) (*KvReply, error)
 	KvMatch(ctx context.Context, in *KvRequest, opts ...grpc.CallOption) (*KvReply, error)
@@ -102,6 +103,15 @@ func (c *daemonClient) SyncValidate(ctx context.Context, in *SyncRequest, opts .
 	return out, nil
 }
 
+func (c *daemonClient) ProfileMemory(ctx context.Context, in *ProfileRequest, opts ...grpc.CallOption) (*Reply, error) {
+	out := new(Reply)
+	err := c.cc.Invoke(ctx, "/daemon.Daemon/ProfileMemory", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *daemonClient) KvDel(ctx context.Context, in *KvRequest, opts ...grpc.CallOption) (*KvReply, error) {
 	out := new(KvReply)
 	err := c.cc.Invoke(ctx, "/daemon.Daemon/KvDel", in, out, opts...)
@@ -141,6 +151,7 @@ type DaemonServer interface {
 	SyncIndex(context.Context, *SyncRequest) (*SyncReply, error)
 	SyncLily(context.Context, *SyncRequest) (*SyncReply, error)
 	SyncValidate(context.Context, *SyncRequest) (*SyncReply, error)
+	ProfileMemory(context.Context, *ProfileRequest) (*Reply, error)
 	KvDel(context.Context, *KvRequest) (*KvReply, error)
 	KvGet(context.Context, *KvRequest) (*KvReply, error)
 	KvMatch(context.Context, *KvRequest) (*KvReply, error)
@@ -171,6 +182,9 @@ func (UnimplementedDaemonServer) SyncLily(context.Context, *SyncRequest) (*SyncR
 }
 func (UnimplementedDaemonServer) SyncValidate(context.Context, *SyncRequest) (*SyncReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SyncValidate not implemented")
+}
+func (UnimplementedDaemonServer) ProfileMemory(context.Context, *ProfileRequest) (*Reply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProfileMemory not implemented")
 }
 func (UnimplementedDaemonServer) KvDel(context.Context, *KvRequest) (*KvReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method KvDel not implemented")
@@ -320,6 +334,24 @@ func _Daemon_SyncValidate_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Daemon_ProfileMemory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ProfileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DaemonServer).ProfileMemory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/daemon.Daemon/ProfileMemory",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DaemonServer).ProfileMemory(ctx, req.(*ProfileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Daemon_KvDel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(KvRequest)
 	if err := dec(in); err != nil {
@@ -408,6 +440,10 @@ var Daemon_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SyncValidate",
 			Handler:    _Daemon_SyncValidate_Handler,
+		},
+		{
+			MethodName: "ProfileMemory",
+			Handler:    _Daemon_ProfileMemory_Handler,
 		},
 		{
 			MethodName: "KvDel",

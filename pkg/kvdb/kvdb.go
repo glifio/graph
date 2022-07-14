@@ -25,15 +25,13 @@ func Open() *KvDB {
 
 	once.Do(func() {
 		path := viper.GetViper().GetString("path")
-		opts := badger.DefaultOptions(path)
-		opts.MemTableSize = 16 << 20 // 64 << 20,
-		opts.NumMemtables = 2        // 5
-		opts.BaseTableSize = 16 << 20
-		opts.IndexCacheSize = 100 << 20 // 100 mb or some other size based on the amount of data
-		opts.Compression = options.ZSTD
-		opts.ZSTDCompressionLevel = 3
-		opts.BlockCacheSize = 256 << 20
-		opts.Logger = nil
+		opts := badger.DefaultOptions(path).
+			WithCompression(options.ZSTD).
+			WithSyncWrites(false).
+			WithBlockCacheSize(100 * (1 << 20)).
+			WithIndexCacheSize(100 * (1 << 20)).
+			WithZSTDCompressionLevel(3)
+			// opts.Logger = nil
 		badgerDb, err := badger.Open(opts)
 		if err != nil {
 			log.Fatal(err)
@@ -52,7 +50,11 @@ func (kv *KvDB) DB() *badger.DB {
 }
 
 func (kv *KvDB) Close() error {
-	return kv.db.Close()
+	if kv.db != nil {
+		log.Println("kv stopped")
+		return kv.db.Close()
+	}
+	return nil
 }
 
 // Check if key exists.
@@ -134,13 +136,13 @@ func (kv *KvDB) Del(key []byte) error {
 func (kv *KvDB) Set(key []byte, val []byte) error {
 	// Write batch
 	if kv.wb != nil {
-		//log.Printf("kv -> Set wb %s\n", string(key))
+		log.Printf("kv -> Set wb %s\n", string(key))
 		return kv.wb.Set(key, val)
 	}
 
 	// Transaction
 	if kv.txn != nil {
-		//log.Printf("kv -> Set txn %s\n", string(key))
+		log.Printf("kv -> Set txn %s\n", string(key))
 		err := kv.txn.Set(key, val)
 
 		// If txn too big: commit, start a new txn and try again
@@ -196,31 +198,25 @@ func (kv *KvDB) SetNX(key []byte, val []byte) error {
 }
 
 func (kv *KvDB) SetNxTx(key []byte, val []byte, txn *badger.Txn) error {
-	return kv.db.View(func(txn *badger.Txn) error {
-		if _, err := txn.Get(key); err == badger.ErrKeyNotFound {
-			return kv.Set(key, val)
+	return kv.db.View(func(t *badger.Txn) error {
+		if _, err := t.Get(key); err == badger.ErrKeyNotFound {
+			return kv.SetTx(key, val, txn)
 		}
 		return nil
 	})
 }
 
-func (kv *KvDB) SetNxWb(key []byte, val []byte, wb *badger.WriteBatch) error {
-	return kv.db.View(func(txn *badger.Txn) error {
-		_, err := txn.Get(key)
+func (kv *KvDB) SetNxWb(key []byte, val []byte, wb *badger.WriteBatch) (bool, error) {
+	var created bool
+	err := kv.db.View(func(t *badger.Txn) error {
+		_, err := t.Get(key)
 		if err == badger.ErrKeyNotFound {
-			return kv.Set(key, val)
+			created = true
+			return wb.Set(key, val)
 		}
 		return err
 	})
-}
-
-func (kv *KvDB) SetNXs(key []byte, val []byte) error {
-	return kv.db.Update(func(txn *badger.Txn) error {
-		if _, err := txn.Get(key); err == badger.ErrKeyNotFound {
-			return txn.Set(key, val)
-		}
-		return nil
-	})
+	return created, err
 }
 
 func (kv *KvDB) Search(prefix []byte, limit uint, offset uint) ([][]byte, error) {

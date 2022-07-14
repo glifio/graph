@@ -146,7 +146,8 @@ func SetIdToAddress(id address.Address, robust address.Address, wb *badger.Write
 	}
 
 	// store adddress
-	return db.SetNxWb(key, val, wb)
+	_, err = db.SetNxWb(key, val, wb)
+	return err
 }
 
 func SetAddressToId(robust address.Address, id address.Address, wb *badger.WriteBatch) error {
@@ -166,8 +167,9 @@ func SetAddressToId(robust address.Address, id address.Address, wb *badger.Write
 	}
 
 	// set cache
-	GetCacheInstance().cache.SetWithTTL(key, val, 1, 60*time.Minute)
+	GetCacheInstance().cache.SetWithTTL(key, val, 1, 5*time.Minute)
 
 	// store adddress
-	return db.SetNxWb(key, val, wb)
+	_, err = db.SetNxWb(key, val, wb)
+	return err
 }

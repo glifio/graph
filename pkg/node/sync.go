@@ -10,6 +10,7 @@ import (
 	badger "github.com/dgraph-io/badger/v3"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/glifio/graph/gql/model"
 	"github.com/glifio/graph/pkg/kvdb"
 	"github.com/glifio/graph/pkg/postgres"
 	"github.com/spf13/viper"
@@ -169,17 +170,95 @@ func Sync(p0 context.Context, _confidence uint64, _height uint64, _length uint64
 // ctx, cancel = context.WithCancel(context.Background())
 // go SyncTipsetStart(ctx)
 
-// func SyncTipsetStart(ctx context.Context) {
-// 	select {
-// 	case <-time.After(2000 * time.Millisecond):
-// 		//log.Printf("cache -> tipset %s %s\n", elem.Val.Height(), elem.Type)
-// 		SyncTipset(context.Background(), elem.Val.Key(), int(elem.Val.Height()))
-// 	case <-ctx.Done():
-// 		// log.Printf("cache -> tipset %s %s\n", elem.Val.Height(), "halted")
-// 	}
-// }
+var jobs chan types.TipSetKey
+var results chan types.TipSetKey
+var status chan *model.Status
 
-func SyncTipset(p0 context.Context, _confidence uint64, _height uint64, _length uint64) {
+var currentStatus = model.Status{Height: 0, Estimate: 0}
+
+func SyncStatus() *model.Status {
+	return &currentStatus
+}
+
+func SyncTipsetStart(ctx context.Context, _confidence uint64, _height uint64, _length uint64) {
+	ch, _ := lotus.api.ChainHead(ctx)
+	height := uint64(ch.Height()) - _confidence
+	ts, _ := lotus.api.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(height), types.EmptyTSK)
+	tsk := ts.Key()
+
+	jobs = make(chan types.TipSetKey, 5)
+	results = make(chan types.TipSetKey, 5)
+	go SyncTipsetWorker(ctx, 1, jobs, results)
+
+	log.Printf("tipset -> start at %d\n", ts.Height())
+
+	// if true {
+	// 	f, err := os.Create("cpuprofile")
+	// 	if err != nil {
+	// 		log.Fatal(err)
+	// 	}
+	// 	pprof.StartCPUProfile(f)
+	// 	defer pprof.StopCPUProfile()
+	// }
+
+	jobs <- tsk
+	for {
+		select {
+		case tsk = <-results:
+			jobs <- tsk
+		case <-ctx.Done():
+			time.Sleep(3 * time.Second)
+			close(jobs)
+			close(results)
+			log.Printf("tipset -> %s\n", "halted")
+			return
+		}
+	}
+}
+
+func SyncTipsetWorker(ctx context.Context, id int, jobs <-chan types.TipSetKey, result chan<- types.TipSetKey) {
+	db := kvdb.Open()
+
+	// start a write batch
+	wb := db.Batch()
+	wb.SetMaxPendingTxns(64)
+	defer wb.Cancel()
+
+	start := time.Now()
+
+	for {
+		select {
+		case key := <-jobs:
+			// get tipset
+			ts, err := GetTipSet(key, wb)
+			if err != nil {
+				log.Println(err)
+				result <- types.TipSetKey{}
+			}
+			// get messages
+			_, _ = UpdateTipSetMessages(ts, wb)
+
+			// log stats
+			if ts.Height()%100 == 0 {
+				timeElapsed := time.Since(start)
+				estimate := (float64(ts.Height()) / 100) * timeElapsed.Seconds()
+				dur := time.Duration(estimate) * time.Second
+				start = time.Now()
+				currentStatus.Height = uint64(ts.Height())
+				currentStatus.Estimate = int64(estimate)
+				log.Printf("tipset(%d) -> stats h:%s dur:%s est:%s\n", id, ts.Height(), timeElapsed, dur)
+			}
+			// return parent tipset
+			result <- ts.Parents()
+		case <-ctx.Done():
+			log.Printf("tipset worker -> %s\n", "halted")
+			wb.Flush()
+			return
+		}
+	}
+}
+
+func SyncTipset_deleteme(p0 context.Context, _confidence uint64, _height uint64, _length uint64) {
 	var count uint
 
 	db := kvdb.Open()
@@ -229,7 +308,6 @@ func SyncTipset(p0 context.Context, _confidence uint64, _height uint64, _length 
 				estimate := (float64(ts.Height()) / 1000) * timeElapsed.Seconds()
 				dur := time.Duration(estimate) * time.Second
 				start = time.Now()
-				wb.Flush()
 				log.Printf("tipset sync -> stats h:%s dur:%s est:%s\n", ts.Height(), timeElapsed, dur)
 			}
 
@@ -274,7 +352,7 @@ func SyncMessages(p0 context.Context, _confidence uint64, _height uint64, _lengt
 			_ = item.Value(func(val []byte) error {
 				ts := &types.TipSet{}
 				if err := ts.UnmarshalCBOR(bytes.NewReader(val)); err == nil {
-					err = UpdateTipSetMessages(ts, wb)
+					_, err = UpdateTipSetMessages(ts, wb)
 					//_, err = SyncTipSetMessages(p0, ts, wb)
 					if err != nil {
 						log.Println(err)
@@ -375,6 +453,8 @@ func SyncMessages(p0 context.Context, _confidence uint64, _height uint64, _lengt
 // }
 
 func SyncTipSetTop(p0 context.Context) error {
+	db := kvdb.Open()
+
 	ch, err := lotus.api.ChainHead(context.Background())
 	if err != nil {
 		return err
@@ -386,9 +466,9 @@ func SyncTipSetTop(p0 context.Context) error {
 		return err
 	}
 
-	wb := kvdb.Open().Batch()
-	wb.SetMaxPendingTxns(128)
-	defer kvdb.Open().Cancel()
+	wb := db.Batch()
+	wb.SetMaxPendingTxns(512)
+	defer wb.Cancel()
 
 	_tsk := ts.Key()
 
@@ -411,14 +491,14 @@ func SyncTipSetTop(p0 context.Context) error {
 		log.Printf("sync -> timer h:%d messages:%d\n", ts.Height(), count)
 
 		loop++
-		if loop > 5 {
+		if loop > 10 {
 			break
 		}
 
 		_tsk = ts.Parents()
 	}
 
-	kvdb.Open().Flush()
+	wb.Flush()
 	return nil
 }
 

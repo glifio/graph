@@ -31,7 +31,7 @@ func GetLotusMessage(cid gocid.Cid, ts *types.TipSet, wb *badger.WriteBatch) (*a
 			return nil, err
 		}
 		msg := api.Message{Cid: cid, Message: res}
-		err = SetMessage(msg, ts, wb)
+		_, err = SetMessage(msg, ts, wb)
 		return &msg, err
 	}
 
@@ -87,30 +87,38 @@ func DecodeMessage(val []byte) (*model.Message, error) {
 	return &item, nil
 }
 
-func SetMessage(message api.Message, ts *types.TipSet, wb *badger.WriteBatch) error {
+func SetMessage(message api.Message, ts *types.TipSet, wb *badger.WriteBatch) (bool, error) {
 	db := kvdb.Open()
 
 	// key is cid:[cid]
 	keyMsg := []byte("cid:" + message.Cid.String())
 
 	// encode message
-	newMsg := &graph.Message{}
-	newMsg.CopyMessage(message.Message, uint64(ts.Height()))
-	val, err := proto.Marshal(newMsg)
+	buf := new(bytes.Buffer)
+	if err := message.Message.MarshalCBOR(buf); err != nil {
+		return false, err
+	}
+
+	val, err := proto.Marshal(&graph.Message{MessageCbor: buf.Bytes(), Height: uint64(ts.Height())})
+
+	// newMsg := &graph.Message{}
+	// newMsg.Serialize(message.Message, uint64(ts.Height()))
+	// val, err := proto.Marshal(newMsg)
+
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// store message
-	err = db.SetNxWb(keyMsg, val, wb)
+	created, err := db.SetNxWb(keyMsg, val, wb)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// add search index
 	AddAddressToMessageIndex(context.Background(), &message, ts, wb)
 
-	return err
+	return created, err
 }
 
 func SetMessageNoIndex(message api.Message, ts *types.TipSet, wb *badger.WriteBatch) error {
@@ -120,15 +128,18 @@ func SetMessageNoIndex(message api.Message, ts *types.TipSet, wb *badger.WriteBa
 	keyMsg := []byte("cid:" + message.Cid.String())
 
 	// encode message
-	newMsg := &graph.Message{}
-	newMsg.CopyMessage(message.Message, uint64(ts.Height()))
-	val, err := proto.Marshal(newMsg)
+	buf := new(bytes.Buffer)
+	if err := message.Message.MarshalCBOR(buf); err != nil {
+		return err
+	}
+
+	val, err := proto.Marshal(&graph.Message{MessageCbor: buf.Bytes(), Height: uint64(ts.Height())})
 	if err != nil {
 		return err
 	}
 
 	// store message
-	err = db.SetNxWb(keyMsg, val, wb)
+	_, err = db.SetNxWb(keyMsg, val, wb)
 	if err != nil {
 		return err
 	}
@@ -175,7 +186,7 @@ func SetAddressIndex(ctx context.Context, addr address.Address, ulid ulid.ULID, 
 	id, err := GetIdAddress(ctx, addr, tsk, wb)
 	if err == nil {
 		key := "ami:" + id.String() + ":" + ulid.String()
-		_ = db.SetNxWb([]byte(key), []byte(cid.String()), wb)
+		_, _ = db.SetNxWb([]byte(key), []byte(cid.String()), wb)
 	}
 }
 

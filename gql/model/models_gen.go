@@ -74,6 +74,11 @@ type QueryMessage struct {
 	Messages []*Message `json:"messages"`
 }
 
+type Status struct {
+	Height   uint64 `json:"height"`
+	Estimate int64  `json:"estimate"`
+}
+
 type TipSet struct {
 	Cids   []string `json:"cids"`
 	Blks   []*Block `json:"blks"`
