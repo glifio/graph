@@ -78,6 +78,10 @@ type ComplexityRoot struct {
 		Height func(childComplexity int) int
 	}
 
+	ExecutionTrace struct {
+		ExecutionTrace func(childComplexity int) int
+	}
+
 	GasCost struct {
 		BaseFeeBurn        func(childComplexity int) int
 		GasUsed            func(childComplexity int) int
@@ -86,6 +90,12 @@ type ComplexityRoot struct {
 		OverEstimationBurn func(childComplexity int) int
 		Refund             func(childComplexity int) int
 		TotalCost          func(childComplexity int) int
+	}
+
+	InvocResult struct {
+		ExecutionTrace func(childComplexity int) int
+		GasCost        func(childComplexity int) int
+		Receipt        func(childComplexity int) int
 	}
 
 	Message struct {
@@ -177,6 +187,7 @@ type ComplexityRoot struct {
 		Actors               func(childComplexity int) int
 		Address              func(childComplexity int, str string) int
 		Block                func(childComplexity int, address string, height int64) int
+		ExecutionTrace       func(childComplexity int, cid string) int
 		Gascost              func(childComplexity int, cid string) int
 		Message              func(childComplexity int, cid string, height *int) int
 		MessageLowConfidence func(childComplexity int, cid string) int
@@ -189,6 +200,7 @@ type ComplexityRoot struct {
 		PendingMessages      func(childComplexity int, address *string) int
 		Receipt              func(childComplexity int, cid string) int
 		StateListMessages    func(childComplexity int, address string, lookback *int) int
+		StateReplay          func(childComplexity int, cid string) int
 		Status               func(childComplexity int) int
 		Tipset               func(childComplexity int, height uint64) int
 	}
@@ -250,6 +262,8 @@ type QueryResolver interface {
 	Address(ctx context.Context, str string) (*model.Address, error)
 	Gascost(ctx context.Context, cid string) (*model.GasCost, error)
 	Receipt(ctx context.Context, cid string) (*model.MessageReceipt, error)
+	ExecutionTrace(ctx context.Context, cid string) (*model.ExecutionTrace, error)
+	StateReplay(ctx context.Context, cid string) (*model.InvocResult, error)
 	Actor(ctx context.Context, address string) (*model.Actor, error)
 	Actors(ctx context.Context) ([]*model.Actor, error)
 	MsigPending(ctx context.Context, address string) ([]*model.MsigTransaction, error)
@@ -416,6 +430,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ChainHead.Height(childComplexity), true
 
+	case "ExecutionTrace.executionTrace":
+		if e.complexity.ExecutionTrace.ExecutionTrace == nil {
+			break
+		}
+
+		return e.complexity.ExecutionTrace.ExecutionTrace(childComplexity), true
+
 	case "GasCost.baseFeeBurn":
 		if e.complexity.GasCost.BaseFeeBurn == nil {
 			break
@@ -464,6 +485,27 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.GasCost.TotalCost(childComplexity), true
+
+	case "InvocResult.executionTrace":
+		if e.complexity.InvocResult.ExecutionTrace == nil {
+			break
+		}
+
+		return e.complexity.InvocResult.ExecutionTrace(childComplexity), true
+
+	case "InvocResult.gasCost":
+		if e.complexity.InvocResult.GasCost == nil {
+			break
+		}
+
+		return e.complexity.InvocResult.GasCost(childComplexity), true
+
+	case "InvocResult.receipt":
+		if e.complexity.InvocResult.Receipt == nil {
+			break
+		}
+
+		return e.complexity.InvocResult.Receipt(childComplexity), true
 
 	case "Message.cid":
 		if e.complexity.Message.Cid == nil {
@@ -970,6 +1012,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.Block(childComplexity, args["address"].(string), args["height"].(int64)), true
 
+	case "Query.executionTrace":
+		if e.complexity.Query.ExecutionTrace == nil {
+			break
+		}
+
+		args, err := ec.field_Query_executionTrace_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.ExecutionTrace(childComplexity, args["cid"].(string)), true
+
 	case "Query.gascost":
 		if e.complexity.Query.Gascost == nil {
 			break
@@ -1113,6 +1167,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.StateListMessages(childComplexity, args["address"].(string), args["lookback"].(*int)), true
+
+	case "Query.stateReplay":
+		if e.complexity.Query.StateReplay == nil {
+			break
+		}
+
+		args, err := ec.field_Query_stateReplay_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.StateReplay(childComplexity, args["cid"].(string)), true
 
 	case "Query.status":
 		if e.complexity.Query.Status == nil {
@@ -1307,6 +1373,8 @@ type Query {
   address(str: String!): Address
   gascost(cid: String!): GasCost
   receipt(cid: String!): MessageReceipt
+  executionTrace(cid: String!): ExecutionTrace
+  stateReplay(cid: String!): InvocResult
   actor(address: String!): Actor
   actors: [Actor!]!
   msigPending(address: String!): [MsigTransaction!]!
@@ -1369,6 +1437,12 @@ type Message {
   receipt: MessageReceipt!
 }
 
+type InvocResult {
+  gasCost: GasCost
+  receipt: MessageReceipt
+  executionTrace: ExecutionTrace
+}
+
 type GasCost {
   gasUsed: Int64!
   baseFeeBurn: String!
@@ -1377,6 +1451,10 @@ type GasCost {
   minerTip: String!
   refund: String!
   totalCost: String!
+}
+
+type ExecutionTrace {
+  executionTrace: String!
 }
 
 type MessageReceipt {
@@ -1563,6 +1641,21 @@ func (ec *executionContext) field_Query_block_args(ctx context.Context, rawArgs 
 		}
 	}
 	args["height"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_executionTrace_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["cid"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("cid"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["cid"] = arg0
 	return args, nil
 }
 
@@ -1815,6 +1908,21 @@ func (ec *executionContext) field_Query_stateListMessages_args(ctx context.Conte
 		}
 	}
 	args["lookback"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_stateReplay_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["cid"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("cid"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["cid"] = arg0
 	return args, nil
 }
 
@@ -2549,6 +2657,41 @@ func (ec *executionContext) _ChainHead_height(ctx context.Context, field graphql
 	return ec.marshalNInt642int64(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _ExecutionTrace_executionTrace(ctx context.Context, field graphql.CollectedField, obj *model.ExecutionTrace) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "ExecutionTrace",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ExecutionTrace, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _GasCost_gasUsed(ctx context.Context, field graphql.CollectedField, obj *model.GasCost) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -2792,6 +2935,102 @@ func (ec *executionContext) _GasCost_totalCost(ctx context.Context, field graphq
 	res := resTmp.(string)
 	fc.Result = res
 	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _InvocResult_gasCost(ctx context.Context, field graphql.CollectedField, obj *model.InvocResult) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "InvocResult",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.GasCost, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.GasCost)
+	fc.Result = res
+	return ec.marshalOGasCost2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐGasCost(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _InvocResult_receipt(ctx context.Context, field graphql.CollectedField, obj *model.InvocResult) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "InvocResult",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Receipt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.MessageReceipt)
+	fc.Result = res
+	return ec.marshalOMessageReceipt2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageReceipt(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _InvocResult_executionTrace(ctx context.Context, field graphql.CollectedField, obj *model.InvocResult) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "InvocResult",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ExecutionTrace, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.ExecutionTrace)
+	fc.Result = res
+	return ec.marshalOExecutionTrace2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐExecutionTrace(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Message_cid(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
@@ -5592,6 +5831,84 @@ func (ec *executionContext) _Query_receipt(ctx context.Context, field graphql.Co
 	return ec.marshalOMessageReceipt2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageReceipt(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Query_executionTrace(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_executionTrace_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().ExecutionTrace(rctx, args["cid"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.ExecutionTrace)
+	fc.Result = res
+	return ec.marshalOExecutionTrace2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐExecutionTrace(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_stateReplay(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_stateReplay_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().StateReplay(rctx, args["cid"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.InvocResult)
+	fc.Result = res
+	return ec.marshalOInvocResult2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐInvocResult(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Query_actor(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -7587,6 +7904,33 @@ func (ec *executionContext) _ChainHead(ctx context.Context, sel ast.SelectionSet
 	return out
 }
 
+var executionTraceImplementors = []string{"ExecutionTrace"}
+
+func (ec *executionContext) _ExecutionTrace(ctx context.Context, sel ast.SelectionSet, obj *model.ExecutionTrace) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, executionTraceImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ExecutionTrace")
+		case "executionTrace":
+			out.Values[i] = ec._ExecutionTrace_executionTrace(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var gasCostImplementors = []string{"GasCost"}
 
 func (ec *executionContext) _GasCost(ctx context.Context, sel ast.SelectionSet, obj *model.GasCost) graphql.Marshaler {
@@ -7633,6 +7977,34 @@ func (ec *executionContext) _GasCost(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var invocResultImplementors = []string{"InvocResult"}
+
+func (ec *executionContext) _InvocResult(ctx context.Context, sel ast.SelectionSet, obj *model.InvocResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, invocResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("InvocResult")
+		case "gasCost":
+			out.Values[i] = ec._InvocResult_gasCost(ctx, field, obj)
+		case "receipt":
+			out.Values[i] = ec._InvocResult_receipt(ctx, field, obj)
+		case "executionTrace":
+			out.Values[i] = ec._InvocResult_executionTrace(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -8340,6 +8712,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_receipt(ctx, field)
+				return res
+			})
+		case "executionTrace":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_executionTrace(ctx, field)
+				return res
+			})
+		case "stateReplay":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_stateReplay(ctx, field)
 				return res
 			})
 		case "actor":
@@ -9687,6 +10081,13 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	return graphql.MarshalBoolean(*v)
 }
 
+func (ec *executionContext) marshalOExecutionTrace2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐExecutionTrace(ctx context.Context, sel ast.SelectionSet, v *model.ExecutionTrace) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ExecutionTrace(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalOFilUnit2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐFilUnit(ctx context.Context, v interface{}) (*model.FilUnit, error) {
 	if v == nil {
 		return nil, nil
@@ -9738,6 +10139,13 @@ func (ec *executionContext) marshalOInt642ᚖint64(ctx context.Context, sel ast.
 		return graphql.Null
 	}
 	return graphql.MarshalInt64(*v)
+}
+
+func (ec *executionContext) marshalOInvocResult2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐInvocResult(ctx context.Context, sel ast.SelectionSet, v *model.InvocResult) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._InvocResult(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOMessage2ᚕᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessage(ctx context.Context, sel ast.SelectionSet, v []*model.Message) graphql.Marshaler {

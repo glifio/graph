@@ -39,6 +39,10 @@ type ChainHead struct {
 	Height int64 `json:"height"`
 }
 
+type ExecutionTrace struct {
+	ExecutionTrace string `json:"executionTrace"`
+}
+
 type GasCost struct {
 	GasUsed            int64  `json:"gasUsed"`
 	BaseFeeBurn        string `json:"baseFeeBurn"`
@@ -47,6 +51,12 @@ type GasCost struct {
 	MinerTip           string `json:"minerTip"`
 	Refund             string `json:"refund"`
 	TotalCost          string `json:"totalCost"`
+}
+
+type InvocResult struct {
+	GasCost        *GasCost        `json:"gasCost"`
+	Receipt        *MessageReceipt `json:"receipt"`
+	ExecutionTrace *ExecutionTrace `json:"executionTrace"`
 }
 
 type MessageReceipt struct {

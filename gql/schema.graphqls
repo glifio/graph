@@ -23,6 +23,8 @@ type Query {
   address(str: String!): Address
   gascost(cid: String!): GasCost
   receipt(cid: String!): MessageReceipt
+  executionTrace(cid: String!): ExecutionTrace
+  stateReplay(cid: String!): InvocResult
   actor(address: String!): Actor
   actors: [Actor!]!
   msigPending(address: String!): [MsigTransaction!]!
@@ -85,6 +87,12 @@ type Message {
   receipt: MessageReceipt!
 }
 
+type InvocResult {
+  gasCost: GasCost
+  receipt: MessageReceipt
+  executionTrace: ExecutionTrace
+}
+
 type GasCost {
   gasUsed: Int64!
   baseFeeBurn: String!
@@ -93,6 +101,10 @@ type GasCost {
   minerTip: String!
   refund: String!
   totalCost: String!
+}
+
+type ExecutionTrace {
+  executionTrace: String!
 }
 
 type MessageReceipt {
