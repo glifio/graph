@@ -5,8 +5,6 @@
 *.so
 *.dylib
 main
-graph
-data*
 *.bak
 
 # Test binary, built with `go test -c`
@@ -19,4 +17,5 @@ data*
 *.env
 
 # Dependency directories (remove the comment below to include it)
-# vendor/
+data/
+data-calib/

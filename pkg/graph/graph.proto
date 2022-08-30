@@ -1,0 +1,16 @@
+syntax = "proto3";
+package graph;
+
+option go_package = "github.com/glifio/graph";
+
+service Graph {
+    rpc SyncNode (SyncRequest) returns (SyncReply) {}    
+}
+
+message SyncRequest {
+    string name = 1;
+}
+
+message SyncReply {
+    string message = 1;
+}

@@ -1,0 +1,18 @@
+syntax = "proto3";
+package graph;
+
+option go_package = "/pkg/graph";
+
+message Message {
+	uint64  Height = 10;
+    bytes   MessageCbor = 13;   
+}
+
+message TipsetMessages {
+    repeated bytes cids = 1;
+}
+
+message Address {
+    bytes   id = 1;
+    bytes   address = 2;
+}
