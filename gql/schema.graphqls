@@ -67,6 +67,7 @@ type TipSet {
   blks: [Block!]
   height: Uint64!
   key: String!
+  minTimestamp: Uint64!
 }
 
 type Message {
@@ -188,15 +189,17 @@ type Actor {
 }
 
 type Block {
-  Cid: String!
-  Height: Int64!
-  Miner: String!
-  ParentWeight: String!
-  ParentBaseFee: String!
-  ParentStateRoot: String!
-  WinCount: Int64
-  Timestamp: Uint64
-  ForkSignaling: Uint64
+  cid: String!
+  height: Int64!
+  miner: String!
+  parents: [String!]
+  parentWeight: String!
+  parentBaseFee: String!
+  parentStateRoot: String!
+  winCount: Int64
+  messages: String!
+  timestamp: Uint64!
+  forkSignaling: Uint64
 }
 
 type QueryMessage {

@@ -24,15 +24,17 @@ type Address struct {
 }
 
 type Block struct {
-	Cid             string  `json:"Cid"`
-	Height          int64   `json:"Height"`
-	Miner           string  `json:"Miner"`
-	ParentWeight    string  `json:"ParentWeight"`
-	ParentBaseFee   string  `json:"ParentBaseFee"`
-	ParentStateRoot string  `json:"ParentStateRoot"`
-	WinCount        *int64  `json:"WinCount"`
-	Timestamp       *uint64 `json:"Timestamp"`
-	ForkSignaling   *uint64 `json:"ForkSignaling"`
+	Cid             string   `json:"cid"`
+	Height          int64    `json:"height"`
+	Miner           string   `json:"miner"`
+	Parents         []string `json:"parents"`
+	ParentWeight    string   `json:"parentWeight"`
+	ParentBaseFee   string   `json:"parentBaseFee"`
+	ParentStateRoot string   `json:"parentStateRoot"`
+	WinCount        *int64   `json:"winCount"`
+	Messages        string   `json:"messages"`
+	Timestamp       uint64   `json:"timestamp"`
+	ForkSignaling   *uint64  `json:"forkSignaling"`
 }
 
 type ChainHead struct {
@@ -90,10 +92,11 @@ type Status struct {
 }
 
 type TipSet struct {
-	Cids   []string `json:"cids"`
-	Blks   []*Block `json:"blks"`
-	Height uint64   `json:"height"`
-	Key    string   `json:"key"`
+	Cids         []string `json:"cids"`
+	Blks         []*Block `json:"blks"`
+	Height       uint64   `json:"height"`
+	Key          string   `json:"key"`
+	MinTimestamp uint64   `json:"minTimestamp"`
 }
 
 type FilUnit string

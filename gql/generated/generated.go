@@ -66,10 +66,12 @@ type ComplexityRoot struct {
 		Cid             func(childComplexity int) int
 		ForkSignaling   func(childComplexity int) int
 		Height          func(childComplexity int) int
+		Messages        func(childComplexity int) int
 		Miner           func(childComplexity int) int
 		ParentBaseFee   func(childComplexity int) int
 		ParentStateRoot func(childComplexity int) int
 		ParentWeight    func(childComplexity int) int
+		Parents         func(childComplexity int) int
 		Timestamp       func(childComplexity int) int
 		WinCount        func(childComplexity int) int
 	}
@@ -222,10 +224,11 @@ type ComplexityRoot struct {
 	}
 
 	TipSet struct {
-		Blks   func(childComplexity int) int
-		Cids   func(childComplexity int) int
-		Height func(childComplexity int) int
-		Key    func(childComplexity int) int
+		Blks         func(childComplexity int) int
+		Cids         func(childComplexity int) int
+		Height       func(childComplexity int) int
+		Key          func(childComplexity int) int
+		MinTimestamp func(childComplexity int) int
 	}
 }
 
@@ -360,63 +363,77 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Address.Robust(childComplexity), true
 
-	case "Block.Cid":
+	case "Block.cid":
 		if e.complexity.Block.Cid == nil {
 			break
 		}
 
 		return e.complexity.Block.Cid(childComplexity), true
 
-	case "Block.ForkSignaling":
+	case "Block.forkSignaling":
 		if e.complexity.Block.ForkSignaling == nil {
 			break
 		}
 
 		return e.complexity.Block.ForkSignaling(childComplexity), true
 
-	case "Block.Height":
+	case "Block.height":
 		if e.complexity.Block.Height == nil {
 			break
 		}
 
 		return e.complexity.Block.Height(childComplexity), true
 
-	case "Block.Miner":
+	case "Block.messages":
+		if e.complexity.Block.Messages == nil {
+			break
+		}
+
+		return e.complexity.Block.Messages(childComplexity), true
+
+	case "Block.miner":
 		if e.complexity.Block.Miner == nil {
 			break
 		}
 
 		return e.complexity.Block.Miner(childComplexity), true
 
-	case "Block.ParentBaseFee":
+	case "Block.parentBaseFee":
 		if e.complexity.Block.ParentBaseFee == nil {
 			break
 		}
 
 		return e.complexity.Block.ParentBaseFee(childComplexity), true
 
-	case "Block.ParentStateRoot":
+	case "Block.parentStateRoot":
 		if e.complexity.Block.ParentStateRoot == nil {
 			break
 		}
 
 		return e.complexity.Block.ParentStateRoot(childComplexity), true
 
-	case "Block.ParentWeight":
+	case "Block.parentWeight":
 		if e.complexity.Block.ParentWeight == nil {
 			break
 		}
 
 		return e.complexity.Block.ParentWeight(childComplexity), true
 
-	case "Block.Timestamp":
+	case "Block.parents":
+		if e.complexity.Block.Parents == nil {
+			break
+		}
+
+		return e.complexity.Block.Parents(childComplexity), true
+
+	case "Block.timestamp":
 		if e.complexity.Block.Timestamp == nil {
 			break
 		}
 
 		return e.complexity.Block.Timestamp(childComplexity), true
 
-	case "Block.WinCount":
+	case "Block.winCount":
 		if e.complexity.Block.WinCount == nil {
 			break
 		}
@@ -1281,6 +1298,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TipSet.Key(childComplexity), true
 
+	case "TipSet.minTimestamp":
+		if e.complexity.TipSet.MinTimestamp == nil {
+			break
+		}
+
+		return e.complexity.TipSet.MinTimestamp(childComplexity), true
+
 	}
 	return 0, false
 }
@@ -1417,6 +1441,7 @@ type TipSet {
   blks: [Block!]
   height: Uint64!
   key: String!
+  minTimestamp: Uint64!
 }
 
 type Message {
@@ -1538,15 +1563,17 @@ type Actor {
 }
 
 type Block {
-  Cid: String!
-  Height: Int64!
-  Miner: String!
-  ParentWeight: String!
-  ParentBaseFee: String!
-  ParentStateRoot: String!
-  WinCount: Int64
-  Timestamp: Uint64
-  ForkSignaling: Uint64
+  cid: String!
+  height: Int64!
+  miner: String!
+  parents: [String!]
+  parentWeight: String!
+  parentBaseFee: String!
+  parentStateRoot: String!
+  winCount: Int64
+  messages: String!
+  timestamp: Uint64!
+  forkSignaling: Uint64
 }
 
 type QueryMessage {
@@ -2316,7 +2343,7 @@ func (ec *executionContext) _Address_robust(ctx context.Context, field graphql.C
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Block_Cid(ctx context.Context, field graphql.CollectedField, obj *model.Block) (ret graphql.Marshaler) {
+func (ec *executionContext) _Block_cid(ctx context.Context, field graphql.CollectedField, obj *model.Block) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -2351,7 +2378,7 @@ func (ec *executionContext) _Block_Cid(ctx context.Context, field graphql.Collec
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Block_Height(ctx context.Context, field graphql.CollectedField, obj *model.Block) (ret graphql.Marshaler) {
+func (ec *executionContext) _Block_height(ctx context.Context, field graphql.CollectedField, obj *model.Block) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -2386,7 +2413,7 @@ func (ec *executionContext) _Block_Height(ctx context.Context, field graphql.Col
 	return ec.marshalNInt642int64(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Block_Miner(ctx context.Context, field graphql.CollectedField, obj *model.Block) (ret graphql.Marshaler) {
+func (ec *executionContext) _Block_miner(ctx context.Context, field graphql.CollectedField, obj *model.Block) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -2421,7 +2448,39 @@ func (ec *executionContext) _Block_Miner(ctx context.Context, field graphql.Coll
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Block_ParentWeight(ctx context.Context, field graphql.CollectedField, obj *model.Block) (ret graphql.Marshaler) {
+func (ec *executionContext) _Block_parents(ctx context.Context, field graphql.CollectedField, obj *model.Block) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Block",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Parents, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]string)
+	fc.Result = res
+	return ec.marshalOString2ᚕstringᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Block_parentWeight(ctx context.Context, field graphql.CollectedField, obj *model.Block) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -2456,7 +2515,7 @@ func (ec *executionContext) _Block_ParentWeight(ctx context.Context, field graph
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Block_ParentBaseFee(ctx context.Context, field graphql.CollectedField, obj *model.Block) (ret graphql.Marshaler) {
+func (ec *executionContext) _Block_parentBaseFee(ctx context.Context, field graphql.CollectedField, obj *model.Block) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -2491,7 +2550,7 @@ func (ec *executionContext) _Block_ParentBaseFee(ctx context.Context, field grap
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Block_ParentStateRoot(ctx context.Context, field graphql.CollectedField, obj *model.Block) (ret graphql.Marshaler) {
+func (ec *executionContext) _Block_parentStateRoot(ctx context.Context, field graphql.CollectedField, obj *model.Block) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -2526,7 +2585,7 @@ func (ec *executionContext) _Block_ParentStateRoot(ctx context.Context, field gr
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Block_WinCount(ctx context.Context, field graphql.CollectedField, obj *model.Block) (ret graphql.Marshaler) {
+func (ec *executionContext) _Block_winCount(ctx context.Context, field graphql.CollectedField, obj *model.Block) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -2558,7 +2617,42 @@ func (ec *executionContext) _Block_WinCount(ctx context.Context, field graphql.C
 	return ec.marshalOInt642ᚖint64(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Block_Timestamp(ctx context.Context, field graphql.CollectedField, obj *model.Block) (ret graphql.Marshaler) {
+func (ec *executionContext) _Block_messages(ctx context.Context, field graphql.CollectedField, obj *model.Block) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Block",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Messages, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Block_timestamp(ctx context.Context, field graphql.CollectedField, obj *model.Block) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -2583,14 +2677,17 @@ func (ec *executionContext) _Block_Timestamp(ctx context.Context, field graphql.
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*uint64)
+	res := resTmp.(uint64)
 	fc.Result = res
-	return ec.marshalOUint642ᚖuint64(ctx, field.Selections, res)
+	return ec.marshalNUint642uint64(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Block_ForkSignaling(ctx context.Context, field graphql.CollectedField, obj *model.Block) (ret graphql.Marshaler) {
+func (ec *executionContext) _Block_forkSignaling(ctx context.Context, field graphql.CollectedField, obj *model.Block) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -6600,6 +6697,41 @@ func (ec *executionContext) _TipSet_key(ctx context.Context, field graphql.Colle
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _TipSet_minTimestamp(ctx context.Context, field graphql.CollectedField, obj *model.TipSet) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TipSet",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MinTimestamp, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint64)
+	fc.Result = res
+	return ec.marshalNUint642uint64(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) ___Directive_name(ctx context.Context, field graphql.CollectedField, obj *introspection.Directive) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -7830,42 +7962,52 @@ func (ec *executionContext) _Block(ctx context.Context, sel ast.SelectionSet, ob
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Block")
-		case "Cid":
-			out.Values[i] = ec._Block_Cid(ctx, field, obj)
+		case "cid":
+			out.Values[i] = ec._Block_cid(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		case "Height":
-			out.Values[i] = ec._Block_Height(ctx, field, obj)
+		case "height":
+			out.Values[i] = ec._Block_height(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		case "Miner":
-			out.Values[i] = ec._Block_Miner(ctx, field, obj)
+		case "miner":
+			out.Values[i] = ec._Block_miner(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		case "ParentWeight":
-			out.Values[i] = ec._Block_ParentWeight(ctx, field, obj)
+		case "parents":
+			out.Values[i] = ec._Block_parents(ctx, field, obj)
+		case "parentWeight":
+			out.Values[i] = ec._Block_parentWeight(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		case "ParentBaseFee":
-			out.Values[i] = ec._Block_ParentBaseFee(ctx, field, obj)
+		case "parentBaseFee":
+			out.Values[i] = ec._Block_parentBaseFee(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		case "ParentStateRoot":
-			out.Values[i] = ec._Block_ParentStateRoot(ctx, field, obj)
+		case "parentStateRoot":
+			out.Values[i] = ec._Block_parentStateRoot(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		case "WinCount":
-			out.Values[i] = ec._Block_WinCount(ctx, field, obj)
-		case "Timestamp":
-			out.Values[i] = ec._Block_Timestamp(ctx, field, obj)
-		case "ForkSignaling":
-			out.Values[i] = ec._Block_ForkSignaling(ctx, field, obj)
+		case "winCount":
+			out.Values[i] = ec._Block_winCount(ctx, field, obj)
+		case "messages":
+			out.Values[i] = ec._Block_messages(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "timestamp":
+			out.Values[i] = ec._Block_timestamp(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "forkSignaling":
+			out.Values[i] = ec._Block_forkSignaling(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -8922,6 +9064,11 @@ func (ec *executionContext) _TipSet(ctx context.Context, sel ast.SelectionSet, o
 			}
 		case "key":
 			out.Values[i] = ec._TipSet_key(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "minTimestamp":
+			out.Values[i] = ec._TipSet_minTimestamp(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}

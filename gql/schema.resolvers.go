@@ -154,8 +154,22 @@ func (r *queryResolver) Tipset(ctx context.Context, height uint64) (*model.TipSe
 		res.Cids = append(res.Cids, item.String())
 	}
 	for _, item := range ts.Blocks() {
-		res.Blks = append(res.Blks, &model.Block{Cid: item.Cid().String()})
+		nb := &model.Block{
+			Cid:             item.Cid().String(),
+			Miner:           item.Miner.String(),
+			Height:          int64(item.Height),
+			Timestamp:       item.Timestamp,
+			Messages:        item.Messages.String(),
+			ParentBaseFee:   item.ParentBaseFee.String(),
+			ParentWeight:    item.ParentWeight.String(),
+			ParentStateRoot: item.ParentStateRoot.String(),
+		}
+		for _, parent := range item.Parents {
+			nb.Parents = append(nb.Parents, parent.String())
+		}
+		res.Blks = append(res.Blks, nb)
 	}
+	res.MinTimestamp = ts.MinTimestamp()
 
 	return &res, err
 }
