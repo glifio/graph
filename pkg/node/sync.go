@@ -205,6 +205,9 @@ func SyncTipsetStart(ctx context.Context, _confidence uint64, _height uint64, _l
 	for {
 		select {
 		case tsk = <-results:
+			if tsk == types.EmptyTSK {
+				return
+			}
 			jobs <- tsk
 		case <-ctx.Done():
 			time.Sleep(3 * time.Second)
@@ -249,7 +252,12 @@ func SyncTipsetWorker(ctx context.Context, id int, jobs <-chan types.TipSetKey, 
 				log.Printf("tipset(%d) -> stats h:%s dur:%s est:%s\n", id, ts.Height(), timeElapsed, dur)
 			}
 			// return parent tipset
-			result <- ts.Parents()
+			if ts.Height() == 0 {
+				log.Printf("tipset(%d) genesis -> parent:%s\n", id, ts.Parents())
+				result <- types.EmptyTSK
+			} else {
+				result <- ts.Parents()
+			}
 		case <-ctx.Done():
 			log.Printf("tipset worker -> %s\n", "halted")
 			wb.Flush()
