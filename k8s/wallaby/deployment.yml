@@ -1,0 +1,84 @@
+# Copyright 2019 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wallaby-graph-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wallaby-graph-deployment
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  minReadySeconds: 5
+  template:
+    metadata:
+      labels:
+        app: wallaby-graph-deployment
+    spec:
+      containers:
+        - name: wallaby-graph-deployment
+          image: gcr.io/PROJECT_ID/IMAGE:TAG
+          imagePullPolicy: "Always"
+          resources:
+            requests:
+              memory: "6Gi"
+            limits:
+              memory: "10Gi"
+          env:
+            - name: GRAPH_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: wallaby-graph-credentials
+                  key: PORT
+            - name: LILY
+              valueFrom:
+                secretKeyRef:
+                  name: wallaby-graph-credentials
+                  key: LILY
+            - name: LOTUS
+              valueFrom:
+                secretKeyRef:
+                  name: wallaby-graph-credentials
+                  key: LOTUS
+            - name: CONFIDENCE
+              valueFrom:
+                secretKeyRef:
+                  name: wallaby-graph-credentials
+                  key: CONFIDENCE
+          ports:
+            - containerPort: 9090
+          livenessProbe:
+            httpGet:
+              path: /query
+              port: 9090
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /query
+              port: 9090
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - mountPath: /data
+              name: data-volume
+      volumes:
+        - name: data-volume
+          persistentVolumeClaim:
+            claimName: pvc-wallaby-graph
