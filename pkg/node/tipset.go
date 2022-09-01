@@ -70,6 +70,22 @@ func GetTipSetByHeight(height uint64) (*types.TipSet, error) {
 	return ts, nil
 }
 
+func GetTipSetKeyByHeight(height uint64) (*types.TipSetKey, error) {
+	db := kvdb.Open()
+	key := []byte(fmt.Sprintf("h:%d", height))
+
+	val, err := db.Get(key)
+	if err == badger.ErrKeyNotFound {
+		return nil, err
+	}
+
+	tsk, err := types.TipSetKeyFromBytes(val)
+	if err != nil {
+		return nil, err
+	}
+	return &tsk, nil
+}
+
 func ExistsTipSet(tsk types.TipSetKey) bool {
 	db := kvdb.Open()
 

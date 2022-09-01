@@ -439,7 +439,17 @@ func (r *queryResolver) ExecutionTrace(ctx context.Context, cid string) (*model.
 func (r *queryResolver) StateReplay(ctx context.Context, cid string) (*model.InvocResult, error) {
 	_cid, _ := gocid.Decode(cid)
 
-	res, err := r.NodeService.StateReplay(ctx, types.EmptyTSK, _cid)
+	msg, err := node.GetMessage(cid)
+	if err != nil {
+		return nil, err
+	}
+
+	tsk, err := node.GetTipSetKeyByHeight(msg.Height)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := r.NodeService.StateReplay(ctx, *tsk, _cid)
 	if err != nil {
 		return &model.InvocResult{}, nil
 	}
