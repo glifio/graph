@@ -7,18 +7,18 @@ import (
 )
 
 type Message struct {
-	Cid        string  `json:"cid"`
-	Version    uint64  `json:"version"`
-	To         string  `json:"to"`
-	From       string  `json:"from"`
-	Nonce      uint64  `json:"nonce"`
-	Value      string  `json:"value"`
-	GasLimit   int64   `json:"gasLimit"`
-	GasFeeCap  string  `json:"gasFeeCap"`
-	GasPremium string  `json:"gasPremium"`
-	Method     string  `json:"method"`
-	Height     uint64  `json:"height"`
-	Params     *string `json:"params"`
+	Cid        string `json:"cid"`
+	Version    uint64 `json:"version"`
+	To         string `json:"to"`
+	From       string `json:"from"`
+	Nonce      uint64 `json:"nonce"`
+	Value      string `json:"value"`
+	GasLimit   int64  `json:"gasLimit"`
+	GasFeeCap  string `json:"gasFeeCap"`
+	GasPremium string `json:"gasPremium"`
+	Method     string `json:"method"`
+	Height     uint64 `json:"height"`
+	Params     string `json:"params"`
 	// GasCost    *GasCost `json:"gasCost"`
 }
 
@@ -49,19 +49,19 @@ type MessageConfirmed struct {
 	Nonce      uint64 `json:"nonce"`
 	Method     uint64 `json:"method"`
 	//	MethodName         string   `json:"methodName"`
-	ActorName          string  `json:"actorName"`
-	ActorFamily        string  `json:"actorFamily"`
-	ExitCode           int64   `json:"exitCode"`
-	GasUsed            int64   `json:"gasUsed"`
-	ParentBaseFee      string  `json:"parentBaseFee"`
-	BaseFeeBurn        string  `json:"baseFeeBurn"`
-	OverEstimationBurn string  `json:"overEstimationBurn"`
-	MinerPenalty       string  `json:"minerPenalty"`
-	MinerTip           string  `json:"minerTip"`
-	Refund             string  `json:"refund"`
-	GasRefund          int64   `json:"gasRefund"`
-	GasBurned          int64   `json:"gasBurned"`
-	Params             *string `json:"params"`
+	ActorName          string `json:"actorName"`
+	ActorFamily        string `json:"actorFamily"`
+	ExitCode           int64  `json:"exitCode"`
+	GasUsed            int64  `json:"gasUsed"`
+	ParentBaseFee      string `json:"parentBaseFee"`
+	BaseFeeBurn        string `json:"baseFeeBurn"`
+	OverEstimationBurn string `json:"overEstimationBurn"`
+	MinerPenalty       string `json:"minerPenalty"`
+	MinerTip           string `json:"minerTip"`
+	Refund             string `json:"refund"`
+	GasRefund          int64  `json:"gasRefund"`
+	GasBurned          int64  `json:"gasBurned"`
+	Params             string `json:"params"`
 }
 
 type MessagePending struct {
@@ -78,7 +78,7 @@ type MessagePending struct {
 	GasPremium *string `json:"gasPremium"`
 	Method     string  `json:"method"`
 	Height     string  `json:"height"`
-	Params     *string `json:"params"`
+	Params     string  `json:"params"`
 }
 
 func StrPtr(x string) *string {

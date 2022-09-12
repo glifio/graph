@@ -276,12 +276,7 @@ func (r *queryResolver) PendingMessage(ctx context.Context, cid string) (*model.
 		if item.Cid().String() == cid {
 			msg := model.CreatePendingMessage(&item.Message)
 			msg.Cid = item.Cid().String()
-
-			obj, err := node.StateDecodeParams(item.Message.To, item.Message.Method, item.Message.Params)
-
-			if err == nil && obj != "" {
-				msg.Params = &obj
-			}
+			msg.Params = base64.StdEncoding.EncodeToString(item.Message.Params)
 
 			return msg, nil
 		}
@@ -307,11 +302,7 @@ func (r *queryResolver) PendingMessages(ctx context.Context, address *string) ([
 		for _, item := range pending {
 			msg := model.CreatePendingMessage(&item.Message)
 			msg.Cid = item.Cid().String()
-
-			params, err := node.StateDecodeParams(item.Message.To, item.Message.Method, item.Message.Params)
-			if err == nil && params != "" {
-				msg.Params = &params
-			}
+			msg.Params = base64.StdEncoding.EncodeToString(item.Message.Params)
 
 			items = append(items, msg)
 		}
@@ -322,11 +313,7 @@ func (r *queryResolver) PendingMessages(ctx context.Context, address *string) ([
 
 				msg := model.CreatePendingMessage(&item.Message)
 				msg.Cid = item.Cid().String()
-
-				params, err := node.StateDecodeParams(item.Message.To, item.Message.Method, item.Message.Params)
-				if err == nil && params != "" {
-					msg.Params = &params
-				}
+				msg.Params = base64.StdEncoding.EncodeToString(item.Message.Params)
 
 				items = append(items, msg)
 			}
@@ -459,12 +446,7 @@ func (r *queryResolver) MsigPending(ctx context.Context, address string) ([]*mod
 		var item model.MsigTransaction
 		item.ID = iter.ID
 		item.Method = uint64(iter.Method)
-
-		obj, err := node.StateDecodeParams(iter.To, iter.Method, iter.Params)
-
-		if err == nil && obj != "" {
-			item.Params = &obj
-		}
+		item.Params = base64.StdEncoding.EncodeToString(iter.Params)
 
 		txn := &multisig.Transaction{To: iter.To, Value: iter.Value, Method: iter.Method, Params: iter.Params, Approved: iter.Approved}
 		calculatedHash, _ := multisig.ComputeProposalHash(txn, blake2b.Sum256)
@@ -519,12 +501,7 @@ func (r *queryResolver) StateListMessages(ctx context.Context, address string, l
 		item.Refund = iter.GasCost.Refund.String()
 		item.MinerPenalty = iter.GasCost.MinerPenalty.String()
 		item.MinerTip = iter.GasCost.MinerTip.String()
-
-		obj, err := node.StateDecodeParams(iter.Msg.To, iter.Msg.Method, iter.Msg.Params)
-
-		if err == nil && obj != "" {
-			item.Params = &obj
-		}
+		item.Params = base64.StdEncoding.EncodeToString(iter.Msg.Params)
 
 		items = append(items, &item)
 	}
@@ -573,12 +550,7 @@ func (r *queryResolver) MessageLowConfidence(ctx context.Context, cid string) (*
 		item.Refund = iter.GasCost.Refund.String()
 		item.MinerPenalty = iter.GasCost.MinerPenalty.String()
 		item.MinerTip = iter.GasCost.MinerTip.String()
-
-		obj, err := node.StateDecodeParams(iter.Msg.To, iter.Msg.Method, iter.Msg.Params)
-
-		if err == nil && obj != "" {
-			item.Params = &obj
-		}
+		item.Params = base64.StdEncoding.EncodeToString(iter.Msg.Params)
 	}
 
 	return &item, nil
@@ -707,6 +679,7 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 					gaspremium := msg.Message.Message.GasPremium.String()
 					res.Message.GasPremium = &gaspremium
 					res.Message.Method = msg.Message.Message.Method.String()
+					res.Message.Params = base64.StdEncoding.EncodeToString(msg.Message.Message.Params)
 
 					r.mu.Lock()
 
@@ -716,11 +689,6 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 						}
 						//if util.AddressCompareFromTo(observer.address, fromaddr, toaddr) {
 						if observer.address == res.Message.From || observer.address == res.Message.To {
-							obj, err := node.StateDecodeParams(msg.Message.Message.To, msg.Message.Message.Method, msg.Message.Message.Params)
-							if err == nil && obj != "" {
-								res.Message.Params = &obj
-							}
-
 							observer.update <- &res
 						}
 					}

@@ -65,7 +65,7 @@ type MsigTransaction struct {
 	To           *Address   `json:"to"`
 	Value        string     `json:"value"`
 	Method       uint64     `json:"method"`
-	Params       *string    `json:"params"`
+	Params       string     `json:"params"`
 	Approved     []*Address `json:"approved"`
 	ProposalHash string     `json:"proposalHash"`
 }
