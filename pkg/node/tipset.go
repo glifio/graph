@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	badger "github.com/dgraph-io/badger/v3"
 	"github.com/filecoin-project/go-state-types/abi"
@@ -12,6 +13,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/glifio/graph/pkg/graph"
 	"github.com/glifio/graph/pkg/kvdb"
+	"github.com/ipfs/go-cid"
 	gocid "github.com/ipfs/go-cid"
 	"google.golang.org/protobuf/proto"
 )
@@ -68,6 +70,43 @@ func GetTipSetByHeight(height uint64) (*types.TipSet, error) {
 	}
 
 	return ts, nil
+}
+
+func GetTipSetKeyByHeight(height uint64) (*types.TipSetKey, error) {
+	db := kvdb.Open()
+	key := []byte(fmt.Sprintf("h:%d", height))
+
+	val, err := db.Get(key)
+	if err == badger.ErrKeyNotFound {
+		return nil, err
+	}
+
+	tsk, err := TipSetKeyFromString(string(val))
+	if err != nil {
+		return nil, err
+	}
+	return &tsk, nil
+}
+
+func TipSetKeyFromString(value string) (types.TipSetKey, error) {
+	var cids []cid.Cid
+
+	if value == "" {
+		return types.EmptyTSK, fmt.Errorf("empty tipset")
+	}
+
+	s := strings.Split(value[1:len(value)-1], ",")
+	for _, c := range s {
+		res, err := cid.Decode(c)
+		if err != nil {
+			return types.EmptyTSK, err
+		}
+		cids = append(cids, res)
+	}
+
+	tsk := types.NewTipSetKey(cids...)
+
+	return tsk, nil
 }
 
 func ExistsTipSet(tsk types.TipSetKey) bool {

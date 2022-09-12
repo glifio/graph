@@ -6,6 +6,7 @@ package graph
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log"
 	"reflect"
@@ -153,8 +154,22 @@ func (r *queryResolver) Tipset(ctx context.Context, height uint64) (*model.TipSe
 		res.Cids = append(res.Cids, item.String())
 	}
 	for _, item := range ts.Blocks() {
-		res.Blks = append(res.Blks, &model.Block{Cid: item.Cid().String()})
+		nb := &model.Block{
+			Cid:             item.Cid().String(),
+			Miner:           item.Miner.String(),
+			Height:          int64(item.Height),
+			Timestamp:       item.Timestamp,
+			Messages:        item.Messages.String(),
+			ParentBaseFee:   item.ParentBaseFee.String(),
+			ParentWeight:    item.ParentWeight.String(),
+			ParentStateRoot: item.ParentStateRoot.String(),
+		}
+		for _, parent := range item.Parents {
+			nb.Parents = append(nb.Parents, parent.String())
+		}
+		res.Blks = append(res.Blks, nb)
 	}
+	res.MinTimestamp = ts.MinTimestamp()
 
 	return &res, err
 }
@@ -390,6 +405,70 @@ func (r *queryResolver) Receipt(ctx context.Context, cid string) (*model.Message
 	}
 
 	return &receipt, nil
+}
+
+func (r *queryResolver) ExecutionTrace(ctx context.Context, cid string) (*model.ExecutionTrace, error) {
+	_cid, _ := gocid.Decode(cid)
+
+	res, err := r.NodeService.StateReplay(ctx, types.EmptyTSK, _cid)
+	if err != nil {
+		return &model.ExecutionTrace{}, nil
+	}
+
+	bytes, _ := json.Marshal(res.ExecutionTrace)
+	trace := model.ExecutionTrace{
+		ExecutionTrace: string(bytes),
+	}
+
+	return &trace, nil
+}
+
+func (r *queryResolver) StateReplay(ctx context.Context, cid string) (*model.InvocResult, error) {
+	_cid, _ := gocid.Decode(cid)
+
+	msg, err := node.GetMessage(cid)
+	if err != nil {
+		return nil, err
+	}
+
+	tsk, err := node.GetTipSetKeyByHeight(msg.Height)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := r.NodeService.StateReplay(ctx, *tsk, _cid)
+	if err != nil {
+		return &model.InvocResult{}, nil
+	}
+
+	gascost := model.GasCost{
+		GasUsed:            res.GasCost.GasUsed.Int64(),
+		BaseFeeBurn:        res.GasCost.BaseFeeBurn.String(),
+		Refund:             res.GasCost.Refund.String(),
+		MinerPenalty:       res.GasCost.MinerPenalty.String(),
+		MinerTip:           res.GasCost.MinerTip.String(),
+		OverEstimationBurn: res.GasCost.OverEstimationBurn.String(),
+		TotalCost:          res.GasCost.TotalCost.String(),
+	}
+
+	receipt := model.MessageReceipt{
+		ExitCode: int64(res.MsgRct.ExitCode),
+		Return:   base64.StdEncoding.EncodeToString(res.MsgRct.Return),
+		GasUsed:  res.MsgRct.GasUsed,
+	}
+
+	bytes, _ := json.Marshal(res.ExecutionTrace)
+	trace := model.ExecutionTrace{
+		ExecutionTrace: string(bytes),
+	}
+
+	invoc := model.InvocResult{
+		GasCost:        &gascost,
+		Receipt:        &receipt,
+		ExecutionTrace: &trace,
+	}
+
+	return &invoc, nil
 }
 
 func (r *queryResolver) Actor(ctx context.Context, address string) (*model.Actor, error) {
