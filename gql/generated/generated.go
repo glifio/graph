@@ -1500,7 +1500,7 @@ type MessagePending {
   gasFeeCap: String
   gasPremium: String
   method: Uint64!
-  height: String!
+  height: Int64!
   params: String!
 }
 
@@ -1559,7 +1559,7 @@ type Actor {
   Nonce: String!
   Balance(unit: FilUnit = AttoFil): String!
   StateRoot: String!
-  Height: String!
+  Height: Int64!
 }
 
 type Block {
@@ -2268,9 +2268,9 @@ func (ec *executionContext) _Actor_Height(ctx context.Context, field graphql.Col
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(int64)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNInt642int64(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Address_id(ctx context.Context, field graphql.CollectedField, obj *model.Address) (ret graphql.Marshaler) {
@@ -4968,9 +4968,9 @@ func (ec *executionContext) _MessagePending_height(ctx context.Context, field gr
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(int64)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNInt642int64(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MessagePending_params(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {

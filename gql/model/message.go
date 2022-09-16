@@ -77,7 +77,7 @@ type MessagePending struct {
 	GasFeeCap  *string `json:"gasFeeCap"`
 	GasPremium *string `json:"gasPremium"`
 	Method     uint64  `json:"method"`
-	Height     string  `json:"height"`
+	Height     int64   `json:"height"`
 	Params     string  `json:"params"`
 }
 

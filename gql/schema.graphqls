@@ -126,7 +126,7 @@ type MessagePending {
   gasFeeCap: String
   gasPremium: String
   method: Uint64!
-  height: String!
+  height: Int64!
   params: String!
 }
 
@@ -185,7 +185,7 @@ type Actor {
   Nonce: String!
   Balance(unit: FilUnit = AttoFil): String!
   StateRoot: String!
-  Height: String!
+  Height: Int64!
 }
 
 type Block {

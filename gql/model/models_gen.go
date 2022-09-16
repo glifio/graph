@@ -15,7 +15,7 @@ type Actor struct {
 	Nonce     string `json:"Nonce"`
 	Balance   string `json:"Balance"`
 	StateRoot string `json:"StateRoot"`
-	Height    string `json:"Height"`
+	Height    int64  `json:"Height"`
 }
 
 type Address struct {
