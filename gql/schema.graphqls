@@ -81,7 +81,7 @@ type Message {
   gasLimit: Int64!
   gasFeeCap: String!
   gasPremium: String!
-  method: String!
+  method: Uint64!
   height: Uint64!
   params: String!
   gasCost: GasCost!
@@ -125,7 +125,7 @@ type MessagePending {
   gasLimit: String
   gasFeeCap: String
   gasPremium: String
-  method: String!
+  method: Uint64!
   height: String!
   params: String!
 }

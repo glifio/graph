@@ -16,7 +16,7 @@ type Message struct {
 	GasLimit   int64  `json:"gasLimit"`
 	GasFeeCap  string `json:"gasFeeCap"`
 	GasPremium string `json:"gasPremium"`
-	Method     string `json:"method"`
+	Method     uint64 `json:"method"`
 	Height     uint64 `json:"height"`
 	Params     string `json:"params"`
 	// GasCost    *GasCost `json:"gasCost"`
@@ -76,7 +76,7 @@ type MessagePending struct {
 	GasLimit   *string `json:"gasLimit"`
 	GasFeeCap  *string `json:"gasFeeCap"`
 	GasPremium *string `json:"gasPremium"`
-	Method     string  `json:"method"`
+	Method     uint64  `json:"method"`
 	Height     string  `json:"height"`
 	Params     string  `json:"params"`
 }
@@ -96,7 +96,7 @@ func CreatePendingMessage(item *types.Message) *MessagePending {
 		GasLimit:   StrPtr(strconv.FormatInt(item.GasLimit, 10)),
 		GasFeeCap:  StrPtr(item.GasFeeCap.String()),
 		GasPremium: StrPtr(item.GasPremium.String()),
-		Method:     item.Method.String(),
+		Method:     uint64(item.Method),
 	}
 
 	return message
@@ -113,7 +113,7 @@ func CreateMessage(item *types.Message) *Message {
 		GasLimit:   item.GasLimit,
 		GasFeeCap:  item.GasFeeCap.String(),
 		GasPremium: item.GasPremium.String(),
-		Method:     item.Method.String(),
+		Method:     uint64(item.Method),
 	}
 
 	return message

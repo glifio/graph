@@ -757,7 +757,7 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 					res.Message.GasFeeCap = &gasfeecap
 					gaspremium := msg.Message.Message.GasPremium.String()
 					res.Message.GasPremium = &gaspremium
-					res.Message.Method = msg.Message.Message.Method.String()
+					res.Message.Method = uint64(msg.Message.Message.Method)
 					res.Message.Params = base64.StdEncoding.EncodeToString(msg.Message.Message.Params)
 
 					r.mu.Lock()

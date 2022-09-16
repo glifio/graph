@@ -1455,7 +1455,7 @@ type Message {
   gasLimit: Int64!
   gasFeeCap: String!
   gasPremium: String!
-  method: String!
+  method: Uint64!
   height: Uint64!
   params: String!
   gasCost: GasCost!
@@ -1499,7 +1499,7 @@ type MessagePending {
   gasLimit: String
   gasFeeCap: String
   gasPremium: String
-  method: String!
+  method: Uint64!
   height: String!
   params: String!
 }
@@ -3475,9 +3475,9 @@ func (ec *executionContext) _Message_method(ctx context.Context, field graphql.C
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(uint64)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNUint642uint64(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Message_height(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
@@ -4933,9 +4933,9 @@ func (ec *executionContext) _MessagePending_method(ctx context.Context, field gr
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(uint64)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNUint642uint64(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MessagePending_height(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {

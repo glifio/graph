@@ -95,7 +95,7 @@ func (state *SearchStateStruct) CreateMessage() model.Message {
 		item.GasLimit = state.Message.Msg.GasLimit
 		item.GasFeeCap = state.Message.Msg.GasFeeCap.String()
 		item.GasPremium = state.Message.Msg.GasPremium.String()
-		item.Method = state.Message.Msg.Method.String()
+		item.Method = uint64(state.Message.Msg.Method)
 		item.Params = base64.StdEncoding.EncodeToString(state.Message.Msg.Params)
 	}
 
