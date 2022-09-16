@@ -87,8 +87,8 @@ type QueryMessage struct {
 }
 
 type Status struct {
-	Height   uint64 `json:"height"`
-	Estimate int64  `json:"estimate"`
+	Height   int64 `json:"height"`
+	Estimate int64 `json:"estimate"`
 }
 
 type TipSet struct {

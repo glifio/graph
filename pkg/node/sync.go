@@ -247,7 +247,7 @@ func SyncTipsetWorker(ctx context.Context, id int, jobs <-chan types.TipSetKey, 
 				estimate := (float64(ts.Height()) / 100) * timeElapsed.Seconds()
 				dur := time.Duration(estimate) * time.Second
 				start = time.Now()
-				currentStatus.Height = uint64(ts.Height())
+				currentStatus.Height = int64(ts.Height())
 				currentStatus.Estimate = int64(estimate)
 				log.Printf("tipset(%d) -> stats h:%s dur:%s est:%s\n", id, ts.Height(), timeElapsed, dur)
 			}

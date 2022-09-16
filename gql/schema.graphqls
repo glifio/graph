@@ -53,7 +53,7 @@ type ChainHead {
 }
 
 type Status {
-  height: Uint64!
+  height: Int64!
   estimate: Int64!
 }
 

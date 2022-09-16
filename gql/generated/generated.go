@@ -1427,7 +1427,7 @@ type ChainHead {
 }
 
 type Status {
-  height: Uint64!
+  height: Int64!
   estimate: Int64!
 }
 
@@ -6351,9 +6351,9 @@ func (ec *executionContext) _Status_height(ctx context.Context, field graphql.Co
 		}
 		return graphql.Null
 	}
-	res := resTmp.(uint64)
+	res := resTmp.(int64)
 	fc.Result = res
-	return ec.marshalNUint642uint64(ctx, field.Selections, res)
+	return ec.marshalNInt642int64(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Status_estimate(ctx context.Context, field graphql.CollectedField, obj *model.Status) (ret graphql.Marshaler) {
