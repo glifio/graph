@@ -83,7 +83,7 @@ type Message {
   gasPremium: String!
   method: String!
   height: Uint64!
-  params: String
+  params: String!
   gasCost: GasCost!
   receipt: MessageReceipt!
 }
@@ -127,7 +127,7 @@ type MessagePending {
   gasPremium: String
   method: String!
   height: String!
-  params: String
+  params: String!
 }
 
 type MessageConfirmed {
@@ -159,7 +159,7 @@ type MessageConfirmed {
   gasRefund: Int64!
   gasBurned: Int64!
   block: Block!
-  params: String
+  params: String!
 }
 
 type MsigTransaction {
@@ -167,7 +167,7 @@ type MsigTransaction {
   to: Address!
   value: String!
   method: Uint64!
-  params: String
+  params: String!
   approved: [Address!]
   proposalHash: String!
 }
