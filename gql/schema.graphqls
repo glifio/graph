@@ -65,7 +65,7 @@ type MpoolUpdate {
 type TipSet {
   cids: [String!]
   blks: [Block!]
-  height: Uint64!
+  height: Int64!
   key: String!
   minTimestamp: Uint64!
 }

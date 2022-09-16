@@ -146,7 +146,7 @@ func (r *queryResolver) Tipset(ctx context.Context, height uint64) (*model.TipSe
 	}
 
 	res := model.TipSet{
-		Height: uint64(ts.Height()),
+		Height: int64(ts.Height()),
 		Key:    ts.Key().String(),
 	}
 

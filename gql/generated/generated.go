@@ -1439,7 +1439,7 @@ type MpoolUpdate {
 type TipSet {
   cids: [String!]
   blks: [Block!]
-  height: Uint64!
+  height: Int64!
   key: String!
   minTimestamp: Uint64!
 }
@@ -6669,9 +6669,9 @@ func (ec *executionContext) _TipSet_height(ctx context.Context, field graphql.Co
 		}
 		return graphql.Null
 	}
-	res := resTmp.(uint64)
+	res := resTmp.(int64)
 	fc.Result = res
-	return ec.marshalNUint642uint64(ctx, field.Selections, res)
+	return ec.marshalNInt642int64(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _TipSet_key(ctx context.Context, field graphql.CollectedField, obj *model.TipSet) (ret graphql.Marshaler) {

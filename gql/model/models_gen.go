@@ -94,7 +94,7 @@ type Status struct {
 type TipSet struct {
 	Cids         []string `json:"cids"`
 	Blks         []*Block `json:"blks"`
-	Height       uint64   `json:"height"`
+	Height       int64    `json:"height"`
 	Key          string   `json:"key"`
 	MinTimestamp uint64   `json:"minTimestamp"`
 }
