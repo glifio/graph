@@ -12,7 +12,7 @@ type Actor struct {
 	ID        string `json:"id"`
 	Code      string `json:"Code"`
 	Head      string `json:"Head"`
-	Nonce     string `json:"Nonce"`
+	Nonce     uint64 `json:"Nonce"`
 	Balance   string `json:"Balance"`
 	StateRoot string `json:"StateRoot"`
 	Height    int64  `json:"Height"`

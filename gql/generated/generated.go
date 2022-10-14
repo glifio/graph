@@ -1556,7 +1556,7 @@ type Actor {
   id: ID!
   Code: String!
   Head: String!
-  Nonce: String!
+  Nonce: Uint64!
   Balance(unit: FilUnit = AttoFil): String!
   StateRoot: String!
   Height: Int64!
@@ -2156,9 +2156,9 @@ func (ec *executionContext) _Actor_Nonce(ctx context.Context, field graphql.Coll
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(uint64)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNUint642uint64(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Actor_Balance(ctx context.Context, field graphql.CollectedField, obj *model.Actor) (ret graphql.Marshaler) {

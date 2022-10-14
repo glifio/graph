@@ -481,7 +481,7 @@ func (r *queryResolver) Actor(ctx context.Context, address string) (*model.Actor
 			ID:      address,
 			Code:    item.Code.String(),
 			Head:    item.Head.String(),
-			Nonce:   strconv.FormatUint(item.Nonce, 10),
+			Nonce:   item.Nonce,
 			Balance: item.Balance.String(),
 			// StateRoot: item.StateRoot,
 			// Height:    item.Height,

@@ -182,7 +182,7 @@ type Actor {
   id: ID!
   Code: String!
   Head: String!
-  Nonce: String!
+  Nonce: Uint64!
   Balance(unit: FilUnit = AttoFil): String!
   StateRoot: String!
   Height: Int64!
