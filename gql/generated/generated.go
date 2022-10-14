@@ -1493,7 +1493,7 @@ type MessagePending {
   version: String!
   to: Address!
   from: Address!
-  nonce: Uint64
+  nonce: Uint64!
   #value(unit: FilUnit = AttoFil): Float!
   value: String!
   gasLimit: String
@@ -4765,11 +4765,14 @@ func (ec *executionContext) _MessagePending_nonce(ctx context.Context, field gra
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
 	res := resTmp.(uint64)
 	fc.Result = res
-	return ec.marshalOUint642uint64(ctx, field.Selections, res)
+	return ec.marshalNUint642uint64(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MessagePending_value(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
@@ -8547,6 +8550,9 @@ func (ec *executionContext) _MessagePending(ctx context.Context, sel ast.Selecti
 			})
 		case "nonce":
 			out.Values[i] = ec._MessagePending_nonce(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		case "value":
 			out.Values[i] = ec._MessagePending_value(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -10547,15 +10553,6 @@ func (ec *executionContext) marshalOTipSet2ᚖgithubᚗcomᚋglifioᚋgraphᚋgq
 		return graphql.Null
 	}
 	return ec._TipSet(ctx, sel, v)
-}
-
-func (ec *executionContext) unmarshalOUint642uint64(ctx context.Context, v interface{}) (uint64, error) {
-	res, err := graphql.UnmarshalUint64(v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) marshalOUint642uint64(ctx context.Context, sel ast.SelectionSet, v uint64) graphql.Marshaler {
-	return graphql.MarshalUint64(v)
 }
 
 func (ec *executionContext) unmarshalOUint642ᚖuint64(ctx context.Context, v interface{}) (*uint64, error) {
