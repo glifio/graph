@@ -71,7 +71,7 @@ type MessagePending struct {
 	To      string `json:"to"`
 	// To         *Address `json:"to"`
 	// From       *Address `json:"from"`
-	Nonce      *string `json:"nonce"`
+	Nonce      uint64  `json:"nonce"`
 	Value      string  `json:"value"`
 	GasLimit   *string `json:"gasLimit"`
 	GasFeeCap  *string `json:"gasFeeCap"`
@@ -91,7 +91,7 @@ func CreatePendingMessage(item *types.Message) *MessagePending {
 		Version:    strconv.FormatUint(item.Version, 10),
 		From:       item.From.String(),
 		To:         item.To.String(),
-		Nonce:      StrPtr(strconv.FormatUint(item.Nonce, 10)),
+		Nonce:      item.Nonce,
 		Value:      item.Value.String(),
 		GasLimit:   StrPtr(strconv.FormatInt(item.GasLimit, 10)),
 		GasFeeCap:  StrPtr(item.GasFeeCap.String()),

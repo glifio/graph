@@ -748,8 +748,7 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 					res.Message.From = msg.Message.Message.From.String()
 					//toaddr, _ := node.AddressLookup(msg.Message.Message.To.String())
 					res.Message.To = msg.Message.Message.To.String()
-					nonce := strconv.FormatUint(msg.Message.Message.Nonce, 10)
-					res.Message.Nonce = &nonce
+					res.Message.Nonce = msg.Message.Message.Nonce
 					res.Message.Value = msg.Message.Message.Value.String()
 					gaslimit := strconv.FormatInt(msg.Message.Message.GasLimit, 10)
 					res.Message.GasLimit = &gaslimit

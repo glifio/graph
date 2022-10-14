@@ -119,7 +119,7 @@ type MessagePending {
   version: String!
   to: Address!
   from: Address!
-  nonce: String
+  nonce: Uint64
   #value(unit: FilUnit = AttoFil): Float!
   value: String!
   gasLimit: String
