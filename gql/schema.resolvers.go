@@ -38,44 +38,6 @@ func (r *messageResolver) From(ctx context.Context, obj *model.Message) (*model.
 	return node.AddressLookup(obj.From)
 }
 
-func (r *messageResolver) GasCost(ctx context.Context, obj *model.Message) (*model.GasCost, error) {
-	_cid, _ := gocid.Decode(obj.Cid)
-
-	res, err := r.NodeService.StateReplay(ctx, types.EmptyTSK, _cid)
-	if err != nil {
-		return &model.GasCost{}, nil
-	}
-
-	gascost := model.GasCost{
-		GasUsed:            res.GasCost.GasUsed.Int64(),
-		BaseFeeBurn:        res.GasCost.BaseFeeBurn.String(),
-		Refund:             res.GasCost.Refund.String(),
-		MinerPenalty:       res.GasCost.MinerPenalty.String(),
-		MinerTip:           res.GasCost.MinerTip.String(),
-		OverEstimationBurn: res.GasCost.OverEstimationBurn.String(),
-		TotalCost:          res.GasCost.TotalCost.String(),
-	}
-
-	return &gascost, nil
-}
-
-func (r *messageResolver) Receipt(ctx context.Context, obj *model.Message) (*model.MessageReceipt, error) {
-	_cid, _ := gocid.Decode(obj.Cid)
-
-	res, err := r.NodeService.StateReplay(ctx, types.EmptyTSK, _cid)
-	if err != nil {
-		return &model.MessageReceipt{}, nil
-	}
-
-	receipt := model.MessageReceipt{
-		ExitCode: int64(res.MsgRct.ExitCode),
-		Return:   base64.StdEncoding.EncodeToString(res.MsgRct.Return),
-		GasUsed:  res.MsgRct.GasUsed,
-	}
-
-	return &receipt, nil
-}
-
 func (r *messageConfirmedResolver) From(ctx context.Context, obj *model.MessageConfirmed) (*model.Address, error) {
 	return node.AddressLookup(obj.From)
 }
