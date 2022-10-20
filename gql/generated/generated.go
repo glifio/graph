@@ -103,6 +103,7 @@ type ComplexityRoot struct {
 	Message struct {
 		Cid        func(childComplexity int) int
 		From       func(childComplexity int) int
+		GasCost    func(childComplexity int) int
 		GasFeeCap  func(childComplexity int) int
 		GasLimit   func(childComplexity int) int
 		GasPremium func(childComplexity int) int
@@ -110,8 +111,10 @@ type ComplexityRoot struct {
 		Method     func(childComplexity int) int
 		Nonce      func(childComplexity int) int
 		Params     func(childComplexity int) int
+		Receipt    func(childComplexity int) int
 		To         func(childComplexity int) int
 		Value      func(childComplexity int) int
+		Version    func(childComplexity int) int
 	}
 
 	MessageConfirmed struct {
@@ -157,6 +160,7 @@ type ComplexityRoot struct {
 		Params     func(childComplexity int) int
 		To         func(childComplexity int) int
 		Value      func(childComplexity int) int
+		Version    func(childComplexity int) int
 	}
 
 	MessageReceipt struct {
@@ -231,6 +235,9 @@ type ComplexityRoot struct {
 type MessageResolver interface {
 	To(ctx context.Context, obj *model.Message) (*model.Address, error)
 	From(ctx context.Context, obj *model.Message) (*model.Address, error)
+
+	GasCost(ctx context.Context, obj *model.Message) (*model.GasCost, error)
+	Receipt(ctx context.Context, obj *model.Message) (*model.MessageReceipt, error)
 }
 type MessageConfirmedResolver interface {
 	From(ctx context.Context, obj *model.MessageConfirmed) (*model.Address, error)
@@ -531,6 +538,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Message.From(childComplexity), true
 
+	case "Message.gasCost":
+		if e.complexity.Message.GasCost == nil {
+			break
+		}
+
+		return e.complexity.Message.GasCost(childComplexity), true
+
 	case "Message.gasFeeCap":
 		if e.complexity.Message.GasFeeCap == nil {
 			break
@@ -580,6 +594,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Message.Params(childComplexity), true
 
+	case "Message.receipt":
+		if e.complexity.Message.Receipt == nil {
+			break
+		}
+
+		return e.complexity.Message.Receipt(childComplexity), true
+
 	case "Message.to":
 		if e.complexity.Message.To == nil {
 			break
@@ -593,6 +614,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Message.Value(childComplexity), true
+
+	case "Message.version":
+		if e.complexity.Message.Version == nil {
+			break
+		}
+
+		return e.complexity.Message.Version(childComplexity), true
 
 	case "MessageConfirmed.actorFamily":
 		if e.complexity.MessageConfirmed.ActorFamily == nil {
@@ -866,6 +894,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.MessagePending.Value(childComplexity), true
+
+	case "MessagePending.version":
+		if e.complexity.MessagePending.Version == nil {
+			break
+		}
+
+		return e.complexity.MessagePending.Version(childComplexity), true
 
 	case "MessageReceipt.exitCode":
 		if e.complexity.MessageReceipt.ExitCode == nil {
@@ -1411,6 +1446,7 @@ type TipSet {
 
 type Message {
   cid: String!
+  version: Uint64!
   to: Address!
   from: Address!
   nonce: Uint64!
@@ -1422,6 +1458,8 @@ type Message {
   method: Uint64!
   height: Uint64!
   params: String!
+  gasCost: GasCost!
+  receipt: MessageReceipt!
 }
 
 type InvocResult {
@@ -1452,6 +1490,7 @@ type MessageReceipt {
 
 type MessagePending {
   cid: String!
+  version: String!
   to: Address!
   from: Address!
   nonce: Uint64!
@@ -3126,6 +3165,41 @@ func (ec *executionContext) _Message_cid(ctx context.Context, field graphql.Coll
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Message_version(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Message",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Version, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint64)
+	fc.Result = res
+	return ec.marshalNUint642uint64(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Message_to(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -3474,6 +3548,76 @@ func (ec *executionContext) _Message_params(ctx context.Context, field graphql.C
 	res := resTmp.(string)
 	fc.Result = res
 	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Message_gasCost(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Message",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Message().GasCost(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.GasCost)
+	fc.Result = res
+	return ec.marshalNGasCost2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐGasCost(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Message_receipt(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Message",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Message().Receipt(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.MessageReceipt)
+	fc.Result = res
+	return ec.marshalNMessageReceipt2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageReceipt(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MessageConfirmed_cid(ctx context.Context, field graphql.CollectedField, obj *model.MessageConfirmed) (ret graphql.Marshaler) {
@@ -4475,6 +4619,41 @@ func (ec *executionContext) _MessagePending_cid(ctx context.Context, field graph
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
 		return obj.Cid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _MessagePending_version(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "MessagePending",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Version, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -8010,6 +8189,11 @@ func (ec *executionContext) _Message(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
+		case "version":
+			out.Values[i] = ec._Message_version(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		case "to":
 			field := field
 			out.Concurrently(i, func() (res graphql.Marshaler) {
@@ -8078,6 +8262,34 @@ func (ec *executionContext) _Message(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
+		case "gasCost":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Message_gasCost(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
+		case "receipt":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Message_receipt(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -8300,6 +8512,11 @@ func (ec *executionContext) _MessagePending(ctx context.Context, sel ast.Selecti
 			out.Values[i] = graphql.MarshalString("MessagePending")
 		case "cid":
 			out.Values[i] = ec._MessagePending_cid(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "version":
+			out.Values[i] = ec._MessagePending_version(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
@@ -9257,6 +9474,20 @@ func (ec *executionContext) marshalNChainHead2ᚖgithubᚗcomᚋglifioᚋgraph�
 	return ec._ChainHead(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNGasCost2githubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐGasCost(ctx context.Context, sel ast.SelectionSet, v model.GasCost) graphql.Marshaler {
+	return ec._GasCost(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNGasCost2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐGasCost(ctx context.Context, sel ast.SelectionSet, v *model.GasCost) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._GasCost(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNID2string(ctx context.Context, v interface{}) (string, error) {
 	res, err := graphql.UnmarshalID(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -9466,6 +9697,20 @@ func (ec *executionContext) marshalNMessagePending2ᚖgithubᚗcomᚋglifioᚋgr
 		return graphql.Null
 	}
 	return ec._MessagePending(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNMessageReceipt2githubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageReceipt(ctx context.Context, sel ast.SelectionSet, v model.MessageReceipt) graphql.Marshaler {
+	return ec._MessageReceipt(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNMessageReceipt2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMessageReceipt(ctx context.Context, sel ast.SelectionSet, v *model.MessageReceipt) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._MessageReceipt(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNMpoolUpdate2githubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐMpoolUpdate(ctx context.Context, sel ast.SelectionSet, v model.MpoolUpdate) graphql.Marshaler {
