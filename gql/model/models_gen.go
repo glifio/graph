@@ -12,10 +12,10 @@ type Actor struct {
 	ID        string `json:"id"`
 	Code      string `json:"Code"`
 	Head      string `json:"Head"`
-	Nonce     string `json:"Nonce"`
+	Nonce     uint64 `json:"Nonce"`
 	Balance   string `json:"Balance"`
 	StateRoot string `json:"StateRoot"`
-	Height    string `json:"Height"`
+	Height    int64  `json:"Height"`
 }
 
 type Address struct {
@@ -77,7 +77,7 @@ type MsigTransaction struct {
 	To           *Address   `json:"to"`
 	Value        string     `json:"value"`
 	Method       uint64     `json:"method"`
-	Params       *string    `json:"params"`
+	Params       string     `json:"params"`
 	Approved     []*Address `json:"approved"`
 	ProposalHash string     `json:"proposalHash"`
 }
@@ -87,14 +87,14 @@ type QueryMessage struct {
 }
 
 type Status struct {
-	Height   uint64 `json:"height"`
-	Estimate int64  `json:"estimate"`
+	Height   int64 `json:"height"`
+	Estimate int64 `json:"estimate"`
 }
 
 type TipSet struct {
 	Cids         []string `json:"cids"`
 	Blks         []*Block `json:"blks"`
-	Height       uint64   `json:"height"`
+	Height       int64    `json:"height"`
 	Key          string   `json:"key"`
 	MinTimestamp uint64   `json:"minTimestamp"`
 }

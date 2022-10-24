@@ -2,7 +2,7 @@ package node
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"time"
@@ -66,6 +66,7 @@ func (state *SearchStateStruct) ConfirmedMessage() model.MessageConfirmed {
 		item.GasFeeCap = state.Message.Msg.GasFeeCap.String()
 		item.GasPremium = state.Message.Msg.GasPremium.String()
 		item.Method = uint64(state.Message.Msg.Method)
+		item.Params = base64.StdEncoding.EncodeToString(state.Message.Msg.Params)
 	}
 
 	item.GasUsed = state.Message.GasCost.GasUsed.Int64()
@@ -78,12 +79,6 @@ func (state *SearchStateStruct) ConfirmedMessage() model.MessageConfirmed {
 	item.MinerTip = state.Message.GasCost.MinerTip.String()
 
 	//todo add tipsetkey
-	params, err := StateDecodeParams(state.Message.Msg.To, state.Message.Msg.Method, state.Message.Msg.Params)
-
-	if err == nil && params != "" {
-		item.Params = &params
-	}
-
 	return item
 }
 
@@ -100,17 +95,12 @@ func (state *SearchStateStruct) CreateMessage() model.Message {
 		item.GasLimit = state.Message.Msg.GasLimit
 		item.GasFeeCap = state.Message.Msg.GasFeeCap.String()
 		item.GasPremium = state.Message.Msg.GasPremium.String()
-		item.Method = state.Message.Msg.Method.String()
+		item.Method = uint64(state.Message.Msg.Method)
+		item.Params = base64.StdEncoding.EncodeToString(state.Message.Msg.Params)
 	}
 
 	if state.Tipset != nil {
 		item.Height = uint64(state.Tipset.Height())
-	}
-
-	params, err := StateDecodeParams(state.Message.Msg.To, state.Message.Msg.Method, state.Message.Msg.Params)
-
-	if err == nil && params != "" {
-		item.Params = &params
 	}
 
 	return item
@@ -203,24 +193,6 @@ func (t *Node) StateSearchMsg(id string) (*api.MsgLookup, error) {
 	}
 
 	return msg, err
-}
-
-func StateDecodeParams(id address.Address, p2 abi.MethodNum, p3 []byte) (string, error) {
-	var res string
-	if p3 == nil {
-		return res, nil
-	}
-	obj, err := lotus.api.StateDecodeParams(context.Background(), id, p2, p3, types.EmptyTSK)
-	if err != nil {
-		return res, err
-	}
-	parambytes, err := json.Marshal(obj)
-	if err != nil {
-		return res, err
-	}
-	res = string(parambytes)
-
-	return res, err
 }
 
 func (t *Node) MsigGetPending(addr string) ([]*api.MsigTransaction, error) {

@@ -1427,7 +1427,7 @@ type ChainHead {
 }
 
 type Status {
-  height: Uint64!
+  height: Int64!
   estimate: Int64!
 }
 
@@ -1439,7 +1439,7 @@ type MpoolUpdate {
 type TipSet {
   cids: [String!]
   blks: [Block!]
-  height: Uint64!
+  height: Int64!
   key: String!
   minTimestamp: Uint64!
 }
@@ -1455,9 +1455,9 @@ type Message {
   gasLimit: Int64!
   gasFeeCap: String!
   gasPremium: String!
-  method: String!
+  method: Uint64!
   height: Uint64!
-  params: String
+  params: String!
   gasCost: GasCost!
   receipt: MessageReceipt!
 }
@@ -1493,15 +1493,15 @@ type MessagePending {
   version: String!
   to: Address!
   from: Address!
-  nonce: String
+  nonce: Uint64!
   #value(unit: FilUnit = AttoFil): Float!
   value: String!
   gasLimit: String
   gasFeeCap: String
   gasPremium: String
-  method: String!
-  height: String!
-  params: String
+  method: Uint64!
+  height: Int64!
+  params: String!
 }
 
 type MessageConfirmed {
@@ -1533,7 +1533,7 @@ type MessageConfirmed {
   gasRefund: Int64!
   gasBurned: Int64!
   block: Block!
-  params: String
+  params: String!
 }
 
 type MsigTransaction {
@@ -1541,7 +1541,7 @@ type MsigTransaction {
   to: Address!
   value: String!
   method: Uint64!
-  params: String
+  params: String!
   approved: [Address!]
   proposalHash: String!
 }
@@ -1556,10 +1556,10 @@ type Actor {
   id: ID!
   Code: String!
   Head: String!
-  Nonce: String!
+  Nonce: Uint64!
   Balance(unit: FilUnit = AttoFil): String!
   StateRoot: String!
-  Height: String!
+  Height: Int64!
 }
 
 type Block {
@@ -2156,9 +2156,9 @@ func (ec *executionContext) _Actor_Nonce(ctx context.Context, field graphql.Coll
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(uint64)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNUint642uint64(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Actor_Balance(ctx context.Context, field graphql.CollectedField, obj *model.Actor) (ret graphql.Marshaler) {
@@ -2268,9 +2268,9 @@ func (ec *executionContext) _Actor_Height(ctx context.Context, field graphql.Col
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(int64)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNInt642int64(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Address_id(ctx context.Context, field graphql.CollectedField, obj *model.Address) (ret graphql.Marshaler) {
@@ -3475,9 +3475,9 @@ func (ec *executionContext) _Message_method(ctx context.Context, field graphql.C
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(uint64)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNUint642uint64(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Message_height(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
@@ -3540,11 +3540,14 @@ func (ec *executionContext) _Message_params(ctx context.Context, field graphql.C
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Message_gasCost(ctx context.Context, field graphql.CollectedField, obj *model.Message) (ret graphql.Marshaler) {
@@ -4587,11 +4590,14 @@ func (ec *executionContext) _MessageConfirmed_params(ctx context.Context, field 
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MessagePending_cid(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
@@ -4759,11 +4765,14 @@ func (ec *executionContext) _MessagePending_nonce(ctx context.Context, field gra
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(uint64)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNUint642uint64(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MessagePending_value(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
@@ -4927,9 +4936,9 @@ func (ec *executionContext) _MessagePending_method(ctx context.Context, field gr
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(uint64)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNUint642uint64(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MessagePending_height(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
@@ -4962,9 +4971,9 @@ func (ec *executionContext) _MessagePending_height(ctx context.Context, field gr
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(int64)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNInt642int64(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MessagePending_params(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
@@ -4992,11 +5001,14 @@ func (ec *executionContext) _MessagePending_params(ctx context.Context, field gr
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MessageReceipt_exitCode(ctx context.Context, field graphql.CollectedField, obj *model.MessageReceipt) (ret graphql.Marshaler) {
@@ -5339,11 +5351,14 @@ func (ec *executionContext) _MsigTransaction_params(ctx context.Context, field g
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MsigTransaction_approved(ctx context.Context, field graphql.CollectedField, obj *model.MsigTransaction) (ret graphql.Marshaler) {
@@ -6339,9 +6354,9 @@ func (ec *executionContext) _Status_height(ctx context.Context, field graphql.Co
 		}
 		return graphql.Null
 	}
-	res := resTmp.(uint64)
+	res := resTmp.(int64)
 	fc.Result = res
-	return ec.marshalNUint642uint64(ctx, field.Selections, res)
+	return ec.marshalNInt642int64(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Status_estimate(ctx context.Context, field graphql.CollectedField, obj *model.Status) (ret graphql.Marshaler) {
@@ -6657,9 +6672,9 @@ func (ec *executionContext) _TipSet_height(ctx context.Context, field graphql.Co
 		}
 		return graphql.Null
 	}
-	res := resTmp.(uint64)
+	res := resTmp.(int64)
 	fc.Result = res
-	return ec.marshalNUint642uint64(ctx, field.Selections, res)
+	return ec.marshalNInt642int64(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _TipSet_key(ctx context.Context, field graphql.CollectedField, obj *model.TipSet) (ret graphql.Marshaler) {
@@ -8244,6 +8259,9 @@ func (ec *executionContext) _Message(ctx context.Context, sel ast.SelectionSet, 
 			}
 		case "params":
 			out.Values[i] = ec._Message_params(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		case "gasCost":
 			field := field
 			out.Concurrently(i, func() (res graphql.Marshaler) {
@@ -8467,6 +8485,9 @@ func (ec *executionContext) _MessageConfirmed(ctx context.Context, sel ast.Selec
 			})
 		case "params":
 			out.Values[i] = ec._MessageConfirmed_params(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -8529,6 +8550,9 @@ func (ec *executionContext) _MessagePending(ctx context.Context, sel ast.Selecti
 			})
 		case "nonce":
 			out.Values[i] = ec._MessagePending_nonce(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		case "value":
 			out.Values[i] = ec._MessagePending_value(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -8552,6 +8576,9 @@ func (ec *executionContext) _MessagePending(ctx context.Context, sel ast.Selecti
 			}
 		case "params":
 			out.Values[i] = ec._MessagePending_params(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -8665,6 +8692,9 @@ func (ec *executionContext) _MsigTransaction(ctx context.Context, sel ast.Select
 			}
 		case "params":
 			out.Values[i] = ec._MsigTransaction_params(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		case "approved":
 			out.Values[i] = ec._MsigTransaction_approved(ctx, field, obj)
 		case "proposalHash":
