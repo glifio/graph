@@ -122,9 +122,9 @@ type MessagePending {
   nonce: Uint64!
   #value(unit: FilUnit = AttoFil): Float!
   value: String!
-  gasLimit: String
-  gasFeeCap: String
-  gasPremium: String
+  gasLimit: Int64!
+  gasFeeCap: String!
+  gasPremium: String!
   method: Uint64!
   height: Int64!
   params: String!

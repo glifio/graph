@@ -750,12 +750,9 @@ func (r *subscriptionResolver) MpoolUpdate(ctx context.Context, address *string)
 					res.Message.To = msg.Message.Message.To.String()
 					res.Message.Nonce = msg.Message.Message.Nonce
 					res.Message.Value = msg.Message.Message.Value.String()
-					gaslimit := strconv.FormatInt(msg.Message.Message.GasLimit, 10)
-					res.Message.GasLimit = &gaslimit
-					gasfeecap := msg.Message.Message.GasFeeCap.String()
-					res.Message.GasFeeCap = &gasfeecap
-					gaspremium := msg.Message.Message.GasPremium.String()
-					res.Message.GasPremium = &gaspremium
+					res.Message.GasLimit = msg.Message.Message.GasLimit
+					res.Message.GasFeeCap = msg.Message.Message.GasFeeCap.String()
+					res.Message.GasPremium = msg.Message.Message.GasPremium.String()
 					res.Message.Method = uint64(msg.Message.Message.Method)
 					res.Message.Params = base64.StdEncoding.EncodeToString(msg.Message.Message.Params)
 
