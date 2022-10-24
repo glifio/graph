@@ -37,7 +37,7 @@ spec:
           imagePullPolicy: "Always"
           resources:
             requests:
-              memory: "8Gi"
+              memory: "14Gi"
             limits:
               memory: "25Gi"
           env:
@@ -56,6 +56,11 @@ spec:
                 secretKeyRef:
                   name: mainnet-graph-credentials
                   key: LOTUS
+            - name: LOTUS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: mainnet-graph-credentials
+                  key: LOTUS_TOKEN
             - name: CONFIDENCE
               valueFrom:
                 secretKeyRef:

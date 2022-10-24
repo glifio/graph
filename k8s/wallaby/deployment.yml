@@ -56,6 +56,11 @@ spec:
                 secretKeyRef:
                   name: wallaby-graph-credentials
                   key: LOTUS
+            - name: LOTUS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: wallaby-graph-credentials
+                  key: LOTUS_TOKEN
             - name: CONFIDENCE
               valueFrom:
                 secretKeyRef:
