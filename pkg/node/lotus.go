@@ -19,6 +19,7 @@ type LotusNode struct {
 
 type LotusOptions struct {
 	address string
+	token   string
 }
 
 // variabel Global
@@ -31,10 +32,9 @@ func GetLotusInstance(opts *LotusOptions) *LotusNode {
 		lotus = &LotusNode{}
 
 		head := http.Header{}
-		token := ""
 
-		if token != "" {
-			head.Set("Authorization", "Bearer "+token)
+		if opts.token != "" {
+			head.Set("Authorization", "Bearer "+opts.token)
 		}
 
 		var err error

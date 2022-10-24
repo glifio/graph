@@ -111,7 +111,7 @@ func (t *Node) Node() *Node {
 }
 
 func (t *Node) Connect(address1 string, token string) (dtypes.NetworkName, error) {
-	lotus := GetLotusInstance(&LotusOptions{address: address1})
+	lotus := GetLotusInstance(&LotusOptions{address: address1, token: token})
 
 	name, _ := lotus.api.StateNetworkName(context.Background())
 	fmt.Println("network name: ", name)
