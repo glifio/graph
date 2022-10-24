@@ -1496,9 +1496,9 @@ type MessagePending {
   nonce: Uint64!
   #value(unit: FilUnit = AttoFil): Float!
   value: String!
-  gasLimit: String
-  gasFeeCap: String
-  gasPremium: String
+  gasLimit: Int64!
+  gasFeeCap: String!
+  gasPremium: String!
   method: Uint64!
   height: Int64!
   params: String!
@@ -4835,11 +4835,14 @@ func (ec *executionContext) _MessagePending_gasLimit(ctx context.Context, field 
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(int64)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNInt642int64(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MessagePending_gasFeeCap(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
@@ -4867,11 +4870,14 @@ func (ec *executionContext) _MessagePending_gasFeeCap(ctx context.Context, field
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MessagePending_gasPremium(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
@@ -4899,11 +4905,14 @@ func (ec *executionContext) _MessagePending_gasPremium(ctx context.Context, fiel
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(string)
 	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _MessagePending_method(ctx context.Context, field graphql.CollectedField, obj *model.MessagePending) (ret graphql.Marshaler) {
@@ -8560,10 +8569,19 @@ func (ec *executionContext) _MessagePending(ctx context.Context, sel ast.Selecti
 			}
 		case "gasLimit":
 			out.Values[i] = ec._MessagePending_gasLimit(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		case "gasFeeCap":
 			out.Values[i] = ec._MessagePending_gasFeeCap(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		case "gasPremium":
 			out.Values[i] = ec._MessagePending_gasPremium(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		case "method":
 			out.Values[i] = ec._MessagePending_method(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
