@@ -72,13 +72,13 @@ spec:
             httpGet:
               path: /query
               port: 9090
-            initialDelaySeconds: 10
+            initialDelaySeconds: 300
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /query
               port: 9090
-            initialDelaySeconds: 10
+            initialDelaySeconds: 300
             periodSeconds: 10
           volumeMounts:
             - mountPath: /data
