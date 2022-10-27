@@ -16,7 +16,7 @@ name: Deploy wallaby graph to GKE
 
 on:
   push:
-    branches: [main]
+    branches: [fevm]
   workflow_dispatch:
 
 env:
