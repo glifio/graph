@@ -178,8 +178,26 @@ func (r *queryResolver) Message(ctx context.Context, cid string, height *int) (*
 	limit := 1
 	offset := 0
 
-	msgCID, _ := gocid.Decode(cid)
+	msgCID, err := node.CidLookup(cid)
+	if err != nil {
+		log.Printf("cid err: %s\n", err)
+		return nil, err
+	}
+
 	maxheight := node.GetMaxHeight()
+
+	//0x47b2902f6ad75e2beed7dc1d36e5146a75348b4fa8facb9cee1e9c559b70551b
+
+	// eth, err := api.EthHashFromCid(msgCID)
+	// log.Printf("eth hash: %s\n", eth.String())
+	// log.Printf("eth hash err: %s\n", err)
+
+	// if strings.HasPrefix(eth.String(), "0x") {
+	// 	addr, err := api.EthHashFromHex(eth.String()[2:])
+	// 	log.Printf("eth hash: %s\n", addr.String())
+	// 	log.Printf("eth hash err: %s\n", err)
+	// 	log.Printf("cid: %s\n", addr.ToCid().String())
+	// }
 
 	// Look in State
 	matchFunc := func(msg *api.InvocResult) bool {
@@ -287,8 +305,14 @@ func (r *queryResolver) PendingMessage(ctx context.Context, cid string) (*model.
 		return nil, err
 	}
 
+	msgCID, err := node.CidLookup(cid)
+	if err != nil {
+		log.Printf("cid err: %s\n", err)
+		return nil, err
+	}
+
 	for _, item := range pending {
-		if item.Cid().String() == cid {
+		if item.Cid().Equals(*msgCID) {
 			msg := model.CreatePendingMessage(&item.Message)
 			msg.Cid = item.Cid().String()
 			msg.Params = base64.StdEncoding.EncodeToString(item.Message.Params)
@@ -370,9 +394,13 @@ func (r *queryResolver) Address(ctx context.Context, str string) (*model.Address
 }
 
 func (r *queryResolver) Gascost(ctx context.Context, cid string) (*model.GasCost, error) {
-	_cid, _ := gocid.Decode(cid)
+	_cid, err := node.CidLookup(cid)
+	if err != nil {
+		log.Printf("cid err: %s\n", err)
+		return nil, err
+	}
 
-	res, err := r.NodeService.StateReplay(ctx, types.EmptyTSK, _cid)
+	res, err := r.NodeService.StateReplay(ctx, types.EmptyTSK, *_cid)
 	if err != nil {
 		return &model.GasCost{}, nil
 	}
@@ -391,9 +419,13 @@ func (r *queryResolver) Gascost(ctx context.Context, cid string) (*model.GasCost
 }
 
 func (r *queryResolver) Receipt(ctx context.Context, cid string) (*model.MessageReceipt, error) {
-	_cid, _ := gocid.Decode(cid)
+	_cid, err := node.CidLookup(cid)
+	if err != nil {
+		log.Printf("cid err: %s\n", err)
+		return nil, err
+	}
 
-	res, err := r.NodeService.StateReplay(ctx, types.EmptyTSK, _cid)
+	res, err := r.NodeService.StateReplay(ctx, types.EmptyTSK, *_cid)
 	if err != nil {
 		return &model.MessageReceipt{}, nil
 	}
@@ -408,9 +440,13 @@ func (r *queryResolver) Receipt(ctx context.Context, cid string) (*model.Message
 }
 
 func (r *queryResolver) ExecutionTrace(ctx context.Context, cid string) (*model.ExecutionTrace, error) {
-	_cid, _ := gocid.Decode(cid)
+	_cid, err := node.CidLookup(cid)
+	if err != nil {
+		log.Printf("cid err: %s\n", err)
+		return nil, err
+	}
 
-	res, err := r.NodeService.StateReplay(ctx, types.EmptyTSK, _cid)
+	res, err := r.NodeService.StateReplay(ctx, types.EmptyTSK, *_cid)
 	if err != nil {
 		return &model.ExecutionTrace{}, nil
 	}
@@ -424,9 +460,13 @@ func (r *queryResolver) ExecutionTrace(ctx context.Context, cid string) (*model.
 }
 
 func (r *queryResolver) StateReplay(ctx context.Context, cid string) (*model.InvocResult, error) {
-	_cid, _ := gocid.Decode(cid)
+	_cid, err := node.CidLookup(cid)
+	if err != nil {
+		log.Printf("cid err: %s\n", err)
+		return nil, err
+	}
 
-	msg, err := node.GetMessage(cid)
+	msg, err := node.GetMessage(_cid.String())
 	if err != nil {
 		return nil, err
 	}
@@ -436,7 +476,7 @@ func (r *queryResolver) StateReplay(ctx context.Context, cid string) (*model.Inv
 		return nil, err
 	}
 
-	res, err := r.NodeService.StateReplay(ctx, *tsk, _cid)
+	res, err := r.NodeService.StateReplay(ctx, *tsk, *_cid)
 	if err != nil {
 		return &model.InvocResult{}, nil
 	}
@@ -596,7 +636,13 @@ func (r *queryResolver) StateListMessages(ctx context.Context, address string, l
 func (r *queryResolver) MessageLowConfidence(ctx context.Context, cid string) (*model.MessageConfirmed, error) {
 	var item model.MessageConfirmed
 
-	statemsg, err := r.NodeService.StateSearchMsg(cid)
+	_cid, err := node.CidLookup(cid)
+	if err != nil {
+		log.Printf("cid err: %s\n", err)
+		return nil, err
+	}
+
+	statemsg, err := r.NodeService.StateSearchMsg(_cid.String())
 	if err != nil {
 		return nil, err
 	}
