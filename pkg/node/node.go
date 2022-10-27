@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/filecoin-project/go-address"
@@ -18,6 +19,7 @@ import (
 	"github.com/glifio/graph/pkg/kvdb"
 	"github.com/glifio/graph/pkg/postgres"
 	"github.com/ipfs/go-cid"
+	gocid "github.com/ipfs/go-cid"
 	"github.com/spf13/viper"
 	"golang.org/x/xerrors"
 )
@@ -510,7 +512,31 @@ func AddressConvert(id string) (*model.Address, error) {
 	return result, nil
 }
 
+func CidLookup(cid string) (*gocid.Cid, error) {
+	var err error
+	msgCID := gocid.Cid{}
+
+	if strings.HasPrefix(cid, "0x") {
+		ethhash, err := api.EthHashFromHex(cid[2:])
+		if err != nil {
+			log.Printf("eth hash err: %s\n", err)
+			return nil, err
+		}
+		log.Printf("eth hash: %s\n", ethhash.String())
+		log.Printf("cid: %s\n", ethhash.ToCid().String())
+		msgCID = ethhash.ToCid()
+	} else {
+		msgCID, _ = gocid.Decode(cid)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &msgCID, nil
+}
+
 func AddressLookup(id string) (*model.Address, error) {
+	var addr address.Address
+	var err error
 	var key = addressLookupKey + id
 	cache := GetCacheInstance().cache
 
@@ -521,10 +547,26 @@ func AddressLookup(id string) (*model.Address, error) {
 	}
 
 	result := &model.Address{ID: "", Robust: ""}
-	addr, err := address.NewFromString(id)
-	if err != nil {
-		log.Println(err)
-		return nil, err
+
+	if strings.HasPrefix(id, "0x") {
+		ethaddr, err := api.EthAddressFromHex(id[2:])
+		if err != nil {
+			log.Printf("eth addr err: %s\n", err)
+			return nil, err
+		}
+		log.Printf("eth addr: %s\n", ethaddr.String())
+		addr, err = ethaddr.ToFilecoinAddress()
+		if err != nil {
+			log.Println(err)
+			return nil, err
+		}
+		log.Printf("fil addr: %s\n", addr.String())
+	} else {
+		addr, err = address.NewFromString(id)
+		if err != nil {
+			log.Println(err)
+			return nil, err
+		}
 	}
 
 	switch addr.Protocol() {
