@@ -186,19 +186,6 @@ func (r *queryResolver) Message(ctx context.Context, cid string, height *int) (*
 
 	maxheight := node.GetMaxHeight()
 
-	//0x47b2902f6ad75e2beed7dc1d36e5146a75348b4fa8facb9cee1e9c559b70551b
-
-	// eth, err := api.EthHashFromCid(msgCID)
-	// log.Printf("eth hash: %s\n", eth.String())
-	// log.Printf("eth hash err: %s\n", err)
-
-	// if strings.HasPrefix(eth.String(), "0x") {
-	// 	addr, err := api.EthHashFromHex(eth.String()[2:])
-	// 	log.Printf("eth hash: %s\n", addr.String())
-	// 	log.Printf("eth hash err: %s\n", err)
-	// 	log.Printf("cid: %s\n", addr.ToCid().String())
-	// }
-
 	// Look in State
 	matchFunc := func(msg *api.InvocResult) bool {
 		// match on both signed and unsigned cid
@@ -219,7 +206,7 @@ func (r *queryResolver) Message(ctx context.Context, cid string, height *int) (*
 	}
 
 	// Look in Badger
-	return node.GetMessage(cid)
+	return node.GetMessage(msgCID.String())
 }
 
 func (r *queryResolver) Messages(ctx context.Context, address *string, limit *int, offset *int) ([]*model.Message, error) {
