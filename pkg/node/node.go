@@ -14,7 +14,6 @@ import (
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
-	"github.com/fxamacker/cbor"
 	"github.com/glifio/graph/gql/model"
 	"github.com/glifio/graph/pkg/kvdb"
 	"github.com/glifio/graph/pkg/postgres"
@@ -297,75 +296,79 @@ func (t *Node) ChainGetMessagesInTipset(p0 context.Context, p1 types.TipSetKey, 
 		return nil, err
 	}
 
-	// if we are close to chainhead don't run state compute
-	if p3 < 1 {
-		log.Printf("cache -> ignore t=%d\n", p3)
-		var tinvoc []*api.InvocResult
-		for _, iter := range msgs {
-			tmp := api.InvocResult{
-				Msg:    iter.Message,
-				MsgRct: nil,
-				MsgCid: iter.Cid,
-				GasCost: api.MsgGasCost{
-					Message:            iter.Cid,
-					GasUsed:            big.NewInt(0),
-					BaseFeeBurn:        big.NewInt(0),
-					OverEstimationBurn: big.NewInt(0),
-					MinerPenalty:       big.NewInt(0),
-					MinerTip:           big.NewInt(0),
-					Refund:             big.NewInt(0),
-					TotalCost:          big.NewInt(0),
-				},
-			}
-
-			tinvoc = append(tinvoc, &tmp)
-		}
-		return tinvoc, nil
-	}
-
-	var tmsg []*types.Message
+	var tinvoc []*api.InvocResult
 	for _, iter := range msgs {
-		tmsg = append(tmsg, iter.Message)
-	}
-
-	res, err := lotus.api.StateCompute(p0, api.LookbackNoLimit, tmsg, p1)
-
-	if err != nil {
-		return nil, err
-	}
-
-	type ExecReturnBytes struct {
-		_             struct{} `cbor:",toarray"`
-		IDAddress     []byte
-		RobustAddress []byte
-	}
-
-	for _, iter := range res.Trace {
-		if iter.Msg.To.String()[1:] == "01" && iter.Msg.Method == 2 {
-			log.Println("found msg to 01....!", iter.MsgRct.ExitCode)
-			if iter.MsgRct.ExitCode.IsSuccess() {
-				var v ExecReturnBytes
-				err := cbor.Unmarshal(iter.MsgRct.Return, &v)
-				log.Println(err)
-				idaddr, _ := address.NewFromBytes(v.IDAddress)
-				roaddr, _ := address.NewFromBytes(v.RobustAddress)
-				log.Println(idaddr)
-				log.Println(roaddr)
-				modelAddr := model.Address{
-					ID:     idaddr.String(),
-					Robust: roaddr.String(),
-				}
-				cache.SetWithTTL(addressLookupKey+idaddr.String(), modelAddr, 1, 60*time.Minute)
-				cache.SetWithTTL(addressLookupKey+roaddr.String(), modelAddr, 1, 60*time.Minute)
-			}
+		tmp := api.InvocResult{
+			Msg:    iter.Message,
+			MsgRct: nil,
+			MsgCid: iter.Cid,
+			GasCost: api.MsgGasCost{
+				Message:            iter.Cid,
+				GasUsed:            big.NewInt(0),
+				BaseFeeBurn:        big.NewInt(0),
+				OverEstimationBurn: big.NewInt(0),
+				MinerPenalty:       big.NewInt(0),
+				MinerTip:           big.NewInt(0),
+				Refund:             big.NewInt(0),
+				TotalCost:          big.NewInt(0),
+			},
 		}
+
+		tinvoc = append(tinvoc, &tmp)
 	}
 
-	// add to cache
-	//log.Printf("cache -> tipset %d %s\n", p3, "done")
-	cache.SetWithTTL(key, res.Trace, 1, 60*time.Minute)
+	// if we are close to chainhead don't cache
+	if p3 >= 1 {
+		log.Printf("cache -> t=%d\n", p3)
+		cache.SetWithTTL(key, tinvoc, 1, 60*time.Minute)
+	}
+	return tinvoc, nil
 
-	return res.Trace, err
+	// log.Printf("cache -> should not get here t=%d\n", p3)
+
+	// var tmsg []*types.Message
+	// for _, iter := range msgs {
+	// 	tmsg = append(tmsg, iter.Message)
+	// }
+
+	// res, err := lotus.api.StateCompute(p0, api.LookbackNoLimit, tmsg, p1)
+
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// type ExecReturnBytes struct {
+	// 	_             struct{} `cbor:",toarray"`
+	// 	IDAddress     []byte
+	// 	RobustAddress []byte
+	// }
+
+	// for _, iter := range res.Trace {
+	// 	if iter.Msg.To.String()[1:] == "01" && iter.Msg.Method == 2 {
+	// 		log.Println("found msg to 01....!", iter.MsgRct.ExitCode)
+	// 		if iter.MsgRct.ExitCode.IsSuccess() {
+	// 			var v ExecReturnBytes
+	// 			err := cbor.Unmarshal(iter.MsgRct.Return, &v)
+	// 			log.Println(err)
+	// 			idaddr, _ := address.NewFromBytes(v.IDAddress)
+	// 			roaddr, _ := address.NewFromBytes(v.RobustAddress)
+	// 			log.Println(idaddr)
+	// 			log.Println(roaddr)
+	// 			modelAddr := model.Address{
+	// 				ID:     idaddr.String(),
+	// 				Robust: roaddr.String(),
+	// 			}
+	// 			cache.SetWithTTL(addressLookupKey+idaddr.String(), modelAddr, 1, 60*time.Minute)
+	// 			cache.SetWithTTL(addressLookupKey+roaddr.String(), modelAddr, 1, 60*time.Minute)
+	// 		}
+	// 	}
+	// }
+
+	// // add to cache
+	// //log.Printf("cache -> tipset %d %s\n", p3, "done")
+	// cache.SetWithTTL(key, res.Trace, 1, 60*time.Minute)
+
+	// return res.Trace, err
 }
 
 func (t *Node) ChainGetTipSet(p0 context.Context, p1 types.TipSetKey) (*types.TipSet, error) {
@@ -452,7 +455,7 @@ func (t *Node) StateReplay(ctx context.Context, p1 types.TipSetKey, p2 cid.Cid) 
 		return &res, nil
 	}
 
-	res, err := lotus.api.StateReplay(ctx, p1, p2)
+	res, err := lotus.api.StateReplay(ctx, types.EmptyTSK, p2)
 	if err != nil {
 		log.Printf("state replay: %s\n", err)
 		return nil, err
