@@ -389,7 +389,7 @@ func (r *queryResolver) Gascost(ctx context.Context, cid string) (*model.GasCost
 
 	res, err := r.NodeService.StateReplay(ctx, types.EmptyTSK, *_cid)
 	if err != nil {
-		return &model.GasCost{}, nil
+		return &model.GasCost{}, err
 	}
 
 	gascost := model.GasCost{
@@ -414,7 +414,7 @@ func (r *queryResolver) Receipt(ctx context.Context, cid string) (*model.Message
 
 	res, err := r.NodeService.StateReplay(ctx, types.EmptyTSK, *_cid)
 	if err != nil {
-		return &model.MessageReceipt{}, nil
+		return &model.MessageReceipt{}, err
 	}
 
 	receipt := model.MessageReceipt{
@@ -453,17 +453,7 @@ func (r *queryResolver) StateReplay(ctx context.Context, cid string) (*model.Inv
 		return nil, err
 	}
 
-	msg, err := node.GetMessage(_cid.String())
-	if err != nil {
-		return nil, err
-	}
-
-	tsk, err := node.GetTipSetKeyByHeight(msg.Height)
-	if err != nil {
-		return nil, err
-	}
-
-	res, err := r.NodeService.StateReplay(ctx, *tsk, *_cid)
+	res, err := r.NodeService.StateReplay(ctx, types.EmptyTSK, *_cid)
 	if err != nil {
 		return &model.InvocResult{}, nil
 	}
