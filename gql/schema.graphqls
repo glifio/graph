@@ -9,6 +9,7 @@ type Query {
   status: Status!
   block(address: String!, height: Int64!): Block!
   tipset(height: Uint64!): TipSet
+  #  tipsets(limit: Int = 10, offset: Int = 0): [TipSet]
   message(cid: String!, height: Int): Message
   messages(address: String, limit: Int = 10, offset: Int = 0): [Message]
   messagesByHeight(height: Uint64!, limit: Int = 10, offset: Int = 0): [Message]
@@ -21,6 +22,7 @@ type Query {
     offset: Int = 0
   ): [MessageConfirmed!]! # lily
   address(str: String!): Address
+  txID(str: String!): TxID
   gascost(cid: String!): GasCost
   receipt(cid: String!): MessageReceipt
   executionTrace(cid: String!): ExecutionTrace
@@ -176,6 +178,11 @@ type Address {
   id: ID!
   robust: String!
   #actor: Actor!
+}
+
+type TxID {
+  cid: String!
+  ethHash: String!
 }
 
 type Actor {

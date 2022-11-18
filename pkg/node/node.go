@@ -515,15 +515,16 @@ func AddressConvert(id string) (*model.Address, error) {
 	return result, nil
 }
 
-func CidLookup(cid string) (*gocid.Cid, error) {
+func CidLookup(cid string) (*gocid.Cid, *api.EthHash, error) {
 	var err error
-	msgCID := gocid.Cid{}
+	var ethhash api.EthHash
+	var msgCID gocid.Cid
 
 	if strings.HasPrefix(cid, "0x") {
-		ethhash, err := api.EthHashFromHex(cid[2:])
+		ethhash, err = api.EthHashFromHex(cid[2:])
 		if err != nil {
 			log.Printf("eth hash err: %s\n", err)
-			return nil, err
+			return nil, nil, err
 		}
 		log.Printf("eth hash: %s\n", ethhash.String())
 		log.Printf("cid: %s\n", ethhash.ToCid().String())
@@ -531,10 +532,11 @@ func CidLookup(cid string) (*gocid.Cid, error) {
 	} else {
 		msgCID, _ = gocid.Decode(cid)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
+		ethhash, _ = api.EthHashFromCid(msgCID)
 	}
-	return &msgCID, nil
+	return &msgCID, &ethhash, nil
 }
 
 func AddressLookup(id string) (*model.Address, error) {

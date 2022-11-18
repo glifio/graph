@@ -99,6 +99,11 @@ type TipSet struct {
 	MinTimestamp uint64   `json:"minTimestamp"`
 }
 
+type TxID struct {
+	Cid     string `json:"cid"`
+	EthHash string `json:"ethHash"`
+}
+
 type FilUnit string
 
 const (

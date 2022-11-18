@@ -205,6 +205,7 @@ type ComplexityRoot struct {
 		StateReplay          func(childComplexity int, cid string) int
 		Status               func(childComplexity int) int
 		Tipset               func(childComplexity int, height uint64) int
+		TxID                 func(childComplexity int, str string) int
 	}
 
 	QueryMessage struct {
@@ -229,6 +230,11 @@ type ComplexityRoot struct {
 		Height       func(childComplexity int) int
 		Key          func(childComplexity int) int
 		MinTimestamp func(childComplexity int) int
+	}
+
+	TxID struct {
+		Cid     func(childComplexity int) int
+		EthHash func(childComplexity int) int
 	}
 }
 
@@ -263,6 +269,7 @@ type QueryResolver interface {
 	MpoolPending(ctx context.Context, address *string) ([]*model.MpoolUpdate, error)
 	MessagesConfirmed(ctx context.Context, address *string, limit *int, offset *int) ([]*model.MessageConfirmed, error)
 	Address(ctx context.Context, str string) (*model.Address, error)
+	TxID(ctx context.Context, str string) (*model.TxID, error)
 	Gascost(ctx context.Context, cid string) (*model.GasCost, error)
 	Receipt(ctx context.Context, cid string) (*model.MessageReceipt, error)
 	ExecutionTrace(ctx context.Context, cid string) (*model.ExecutionTrace, error)
@@ -1216,6 +1223,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.Tipset(childComplexity, args["height"].(uint64)), true
 
+	case "Query.txID":
+		if e.complexity.Query.TxID == nil {
+			break
+		}
+
+		args, err := ec.field_Query_txID_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.TxID(childComplexity, args["str"].(string)), true
+
 	case "QueryMessage.messages":
 		if e.complexity.QueryMessage.Messages == nil {
 			break
@@ -1305,6 +1324,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.TipSet.MinTimestamp(childComplexity), true
 
+	case "TxID.cid":
+		if e.complexity.TxID.Cid == nil {
+			break
+		}
+
+		return e.complexity.TxID.Cid(childComplexity), true
+
+	case "TxID.ethHash":
+		if e.complexity.TxID.EthHash == nil {
+			break
+		}
+
+		return e.complexity.TxID.EthHash(childComplexity), true
+
 	}
 	return 0, false
 }
@@ -1383,6 +1416,7 @@ type Query {
   status: Status!
   block(address: String!, height: Int64!): Block!
   tipset(height: Uint64!): TipSet
+  #  tipsets(limit: Int = 10, offset: Int = 0): [TipSet]
   message(cid: String!, height: Int): Message
   messages(address: String, limit: Int = 10, offset: Int = 0): [Message]
   messagesByHeight(height: Uint64!, limit: Int = 10, offset: Int = 0): [Message]
@@ -1395,6 +1429,7 @@ type Query {
     offset: Int = 0
   ): [MessageConfirmed!]! # lily
   address(str: String!): Address
+  txID(str: String!): TxID
   gascost(cid: String!): GasCost
   receipt(cid: String!): MessageReceipt
   executionTrace(cid: String!): ExecutionTrace
@@ -1550,6 +1585,11 @@ type Address {
   id: ID!
   robust: String!
   #actor: Actor!
+}
+
+type TxID {
+  cid: String!
+  ethHash: String!
 }
 
 type Actor {
@@ -1965,6 +2005,21 @@ func (ec *executionContext) field_Query_tipset_args(ctx context.Context, rawArgs
 		}
 	}
 	args["height"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_txID_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["str"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("str"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["str"] = arg0
 	return args, nil
 }
 
@@ -5874,6 +5929,45 @@ func (ec *executionContext) _Query_address(ctx context.Context, field graphql.Co
 	return ec.marshalOAddress2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐAddress(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Query_txID(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_txID_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().TxID(rctx, args["str"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.TxID)
+	fc.Result = res
+	return ec.marshalOTxID2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐTxID(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Query_gascost(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -6754,6 +6848,76 @@ func (ec *executionContext) _TipSet_minTimestamp(ctx context.Context, field grap
 	res := resTmp.(uint64)
 	fc.Result = res
 	return ec.marshalNUint642uint64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TxID_cid(ctx context.Context, field graphql.CollectedField, obj *model.TxID) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TxID",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cid, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _TxID_ethHash(ctx context.Context, field graphql.CollectedField, obj *model.TxID) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "TxID",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.EthHash, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) ___Directive_name(ctx context.Context, field graphql.CollectedField, obj *introspection.Directive) (ret graphql.Marshaler) {
@@ -8882,6 +9046,17 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				res = ec._Query_address(ctx, field)
 				return res
 			})
+		case "txID":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_txID(ctx, field)
+				return res
+			})
 		case "gascost":
 			field := field
 			out.Concurrently(i, func() (res graphql.Marshaler) {
@@ -9117,6 +9292,38 @@ func (ec *executionContext) _TipSet(ctx context.Context, sel ast.SelectionSet, o
 			}
 		case "minTimestamp":
 			out.Values[i] = ec._TipSet_minTimestamp(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var txIDImplementors = []string{"TxID"}
+
+func (ec *executionContext) _TxID(ctx context.Context, sel ast.SelectionSet, obj *model.TxID) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, txIDImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TxID")
+		case "cid":
+			out.Values[i] = ec._TxID_cid(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "ethHash":
+			out.Values[i] = ec._TxID_ethHash(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
@@ -10571,6 +10778,13 @@ func (ec *executionContext) marshalOTipSet2ᚖgithubᚗcomᚋglifioᚋgraphᚋgq
 		return graphql.Null
 	}
 	return ec._TipSet(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOTxID2ᚖgithubᚗcomᚋglifioᚋgraphᚋgqlᚋmodelᚐTxID(ctx context.Context, sel ast.SelectionSet, v *model.TxID) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._TxID(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOUint642ᚖuint64(ctx context.Context, v interface{}) (*uint64, error) {

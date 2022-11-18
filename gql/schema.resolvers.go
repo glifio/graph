@@ -178,7 +178,7 @@ func (r *queryResolver) Message(ctx context.Context, cid string, height *int) (*
 	limit := 1
 	offset := 0
 
-	msgCID, err := node.CidLookup(cid)
+	msgCID, _, err := node.CidLookup(cid)
 	if err != nil {
 		log.Printf("cid err: %s\n", err)
 		return nil, err
@@ -292,7 +292,7 @@ func (r *queryResolver) PendingMessage(ctx context.Context, cid string) (*model.
 		return nil, err
 	}
 
-	msgCID, err := node.CidLookup(cid)
+	msgCID, _, err := node.CidLookup(cid)
 	if err != nil {
 		log.Printf("cid err: %s\n", err)
 		return nil, err
@@ -380,8 +380,20 @@ func (r *queryResolver) Address(ctx context.Context, str string) (*model.Address
 	return addr, err
 }
 
+func (r *queryResolver) TxID(ctx context.Context, str string) (*model.TxID, error) {
+	cid, ethhash, err := node.CidLookup(str)
+	if err != nil {
+		return nil, err
+	}
+	rs := model.TxID{
+		Cid:     cid.String(),
+		EthHash: ethhash.String(),
+	}
+	return &rs, err
+}
+
 func (r *queryResolver) Gascost(ctx context.Context, cid string) (*model.GasCost, error) {
-	_cid, err := node.CidLookup(cid)
+	_cid, _, err := node.CidLookup(cid)
 	if err != nil {
 		log.Printf("cid err: %s\n", err)
 		return nil, err
@@ -406,7 +418,7 @@ func (r *queryResolver) Gascost(ctx context.Context, cid string) (*model.GasCost
 }
 
 func (r *queryResolver) Receipt(ctx context.Context, cid string) (*model.MessageReceipt, error) {
-	_cid, err := node.CidLookup(cid)
+	_cid, _, err := node.CidLookup(cid)
 	if err != nil {
 		log.Printf("cid err: %s\n", err)
 		return nil, err
@@ -427,7 +439,7 @@ func (r *queryResolver) Receipt(ctx context.Context, cid string) (*model.Message
 }
 
 func (r *queryResolver) ExecutionTrace(ctx context.Context, cid string) (*model.ExecutionTrace, error) {
-	_cid, err := node.CidLookup(cid)
+	_cid, _, err := node.CidLookup(cid)
 	if err != nil {
 		log.Printf("cid err: %s\n", err)
 		return nil, err
@@ -447,7 +459,7 @@ func (r *queryResolver) ExecutionTrace(ctx context.Context, cid string) (*model.
 }
 
 func (r *queryResolver) StateReplay(ctx context.Context, cid string) (*model.InvocResult, error) {
-	_cid, err := node.CidLookup(cid)
+	_cid, _, err := node.CidLookup(cid)
 	if err != nil {
 		log.Printf("cid err: %s\n", err)
 		return nil, err
@@ -613,7 +625,7 @@ func (r *queryResolver) StateListMessages(ctx context.Context, address string, l
 func (r *queryResolver) MessageLowConfidence(ctx context.Context, cid string) (*model.MessageConfirmed, error) {
 	var item model.MessageConfirmed
 
-	_cid, err := node.CidLookup(cid)
+	_cid, _, err := node.CidLookup(cid)
 	if err != nil {
 		log.Printf("cid err: %s\n", err)
 		return nil, err
