@@ -13,6 +13,7 @@ import (
 	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/lotus/chain/types/ethtypes"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
 	"github.com/glifio/graph/gql/model"
 	"github.com/glifio/graph/pkg/kvdb"
@@ -515,13 +516,13 @@ func AddressConvert(id string) (*model.Address, error) {
 	return result, nil
 }
 
-func CidLookup(cid string) (*gocid.Cid, *api.EthHash, error) {
+func CidLookup(cid string) (*gocid.Cid, *ethtypes.EthHash, error) {
 	var err error
-	var ethhash api.EthHash
+	var ethhash ethtypes.EthHash
 	var msgCID gocid.Cid
 
 	if strings.HasPrefix(cid, "0x") {
-		ethhash, err = api.EthHashFromHex(cid[2:])
+		ethhash, err = ethtypes.ParseEthHash(cid[2:])
 		if err != nil {
 			log.Printf("eth hash err: %s\n", err)
 			return nil, nil, err
@@ -534,7 +535,7 @@ func CidLookup(cid string) (*gocid.Cid, *api.EthHash, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		ethhash, _ = api.EthHashFromCid(msgCID)
+		ethhash, _ = ethtypes.EthHashFromCid(msgCID)
 	}
 	return &msgCID, &ethhash, nil
 }
@@ -554,7 +555,7 @@ func AddressLookup(id string) (*model.Address, error) {
 	result := &model.Address{ID: "", Robust: ""}
 
 	if strings.HasPrefix(id, "0x") {
-		ethaddr, err := api.EthAddressFromHex(id[2:])
+		ethaddr, err := ethtypes.ParseEthAddress(id[2:])
 		if err != nil {
 			log.Printf("eth addr err: %s\n", err)
 			return nil, err

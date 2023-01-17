@@ -6,35 +6,32 @@ require (
 	github.com/99designs/gqlgen v0.14.0
 	github.com/dgraph-io/badger/v3 v3.2103.2
 	github.com/dgraph-io/ristretto v0.1.0
-	github.com/filecoin-project/go-address v1.0.1-0.20221019124855-ac317c37debb
-	github.com/filecoin-project/go-fil-markets v1.24.0 // indirect
-	github.com/filecoin-project/go-jsonrpc v0.1.9-0.20221021184839-3320738f495f
-	github.com/filecoin-project/go-state-types v0.1.11-0.20221021072238-58379610cafe
+	github.com/filecoin-project/go-address v1.1.0
+	github.com/filecoin-project/go-jsonrpc v0.1.9
+	github.com/filecoin-project/go-state-types v0.10.0-alpha-10
 	github.com/filecoin-project/lily v0.8.5
-	github.com/filecoin-project/lotus v1.16.2-0.20221023140220-9295ec11dd92
+	github.com/filecoin-project/lotus v1.20.0-pre-rc.0.20230115023118-b6eb7fcd962e
 	github.com/filecoin-project/specs-actors/v7 v7.0.1
-	github.com/fxamacker/cbor v1.5.1
 	github.com/getsentry/sentry-go v0.13.0
 	github.com/go-chi/chi v1.5.4
 	github.com/go-pg/pg/v10 v10.10.6
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.5.0
-	github.com/ipfs/go-bitswap v0.10.2 // indirect
-	github.com/ipfs/go-blockservice v0.4.0 // indirect
-	github.com/ipfs/go-cid v0.2.0
+	github.com/ipfs/go-cid v0.3.2
 	github.com/jackc/pgtype v1.11.0
 	github.com/jackc/pgx/v4 v4.16.1
 	github.com/jinzhu/copier v0.3.4
 	github.com/lib/pq v1.10.3
-	github.com/libp2p/go-libp2p-pubsub v0.8.0 // indirect
 	github.com/multiformats/go-multihash v0.2.1
 	github.com/rs/cors v1.7.0
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.9.0
 	github.com/vektah/gqlparser/v2 v2.2.0
-	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
-	golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f
-	google.golang.org/grpc v1.46.2
+	github.com/xlab/c-for-go v0.0.0-20201112171043-ea6dce5809cb // indirect
+	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90
+	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2
+	google.golang.org/grpc v1.47.0
 	google.golang.org/protobuf v1.28.1
+	modernc.org/golex v1.0.1 // indirect
 )
