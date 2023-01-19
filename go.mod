@@ -8,9 +8,9 @@ require (
 	github.com/dgraph-io/ristretto v0.1.0
 	github.com/filecoin-project/go-address v1.1.0
 	github.com/filecoin-project/go-jsonrpc v0.1.9
-	github.com/filecoin-project/go-state-types v0.10.0-alpha-10
+	github.com/filecoin-project/go-state-types v0.10.0-alpha-9.0.20230118014411-cf80be872456
 	github.com/filecoin-project/lily v0.8.5
-	github.com/filecoin-project/lotus v1.20.0-pre-rc.0.20230115023118-b6eb7fcd962e
+	github.com/filecoin-project/lotus v1.20.0-hyperspace-txidmap
 	github.com/filecoin-project/specs-actors/v7 v7.0.1
 	github.com/getsentry/sentry-go v0.13.0
 	github.com/go-chi/chi v1.5.4

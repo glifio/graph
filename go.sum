@@ -470,8 +470,11 @@ github.com/filecoin-project/go-state-types v0.1.5/go.mod h1:UwGVoMsULoCK+bWjEdd/
 github.com/filecoin-project/go-state-types v0.1.6/go.mod h1:UwGVoMsULoCK+bWjEdd/xLCvLAQFBC7EDT477SKml+Q=
 github.com/filecoin-project/go-state-types v0.1.10/go.mod h1:UwGVoMsULoCK+bWjEdd/xLCvLAQFBC7EDT477SKml+Q=
 github.com/filecoin-project/go-state-types v0.1.12/go.mod h1:n/kujdC9JphvYTrmaD1+vJpvDPy/DwzckoMzP0nBKWI=
-github.com/filecoin-project/go-state-types v0.10.0-alpha-10 h1:QUpSayVFUADlrtzCh7SDNlbuaNSlYPBR46Nt7WpFl9I=
 github.com/filecoin-project/go-state-types v0.10.0-alpha-10/go.mod h1:FPgQE05BFwZxKw/vCuIaIrzfJKo4RPQQMMPGd43dAFI=
+github.com/filecoin-project/go-state-types v0.10.0-alpha-9.0.20230118014411-cf80be872456 h1:gT+IBH1eTLqiC+2c1TZjF5QliI20bcn/+3B/fuzio0s=
+github.com/filecoin-project/go-state-types v0.10.0-alpha-9.0.20230118014411-cf80be872456/go.mod h1:FPgQE05BFwZxKw/vCuIaIrzfJKo4RPQQMMPGd43dAFI=
+github.com/filecoin-project/go-state-types v0.10.0-alpha-9.0.20230118045929-0e81ad8029ad h1:4A15h/IBUt1peMyJZOqasqd1D9K7s9p9P7kL1Y0o34A=
+github.com/filecoin-project/go-state-types v0.10.0-alpha-9.0.20230118045929-0e81ad8029ad/go.mod h1:aLIas+W8BWAfpLWEPUOGMPBdhcVwoCG4pIQSQk26024=
 github.com/filecoin-project/go-statemachine v0.0.0-20200925024713-05bd7c71fbfe/go.mod h1:FGwQgZAt2Gh5mjlwJUlVB62JeYdo+if0xWxSEfBD9ig=
 github.com/filecoin-project/go-statemachine v1.0.1/go.mod h1:jZdXXiHa61n4NmgWFG4w8tnqgvZVHYbJ3yW7+y8bF54=
 github.com/filecoin-project/go-statemachine v1.0.2-0.20220322104818-27f8fbb86dfd/go.mod h1:jZdXXiHa61n4NmgWFG4w8tnqgvZVHYbJ3yW7+y8bF54=
@@ -488,8 +491,10 @@ github.com/filecoin-project/index-provider v0.9.1/go.mod h1:NlHxQcy2iMGfUoUGUzrR
 github.com/filecoin-project/lily v0.8.5 h1:1jivwd7VDTAIL08nm/cTCR9hV1pCOJFUuN2z3it12P8=
 github.com/filecoin-project/lily v0.8.5/go.mod h1:gzKk6caWWhsxbRtTVR2tKTqjCSnnootbf4b67uKDR8A=
 github.com/filecoin-project/lotus v1.13.0/go.mod h1:8fzJoIMl+jY5nd6H7wPU98ApC6b2/3yoDKkP6fD0BSU=
-github.com/filecoin-project/lotus v1.20.0-pre-rc.0.20230115023118-b6eb7fcd962e h1:TMUYpDsk+DJHlyiSSJp6EErphKkY/MDfnn++8n43Srw=
-github.com/filecoin-project/lotus v1.20.0-pre-rc.0.20230115023118-b6eb7fcd962e/go.mod h1:Lzz0lq20H+5z2RKaKvrYQK04hpr5Sd7DlFkRwvrSmWQ=
+github.com/filecoin-project/lotus v1.20.0-hyperspace-txidmap h1:le7HV2VWi0gjVc1ub1Fg/71c+O1aFd0vg2aEp609+90=
+github.com/filecoin-project/lotus v1.20.0-hyperspace-txidmap/go.mod h1:61ZGQoiDUAWjgI2ahc7AKC92yJsTm5steyWbkn0jkZE=
+github.com/filecoin-project/lotus v1.20.0-pre-rc.0.20230118010618-fcefc8784013 h1:O+ERAwJIzK8p7Wxh17szD8BFOsHNEokiyDsaSVzjV2E=
+github.com/filecoin-project/lotus v1.20.0-pre-rc.0.20230118010618-fcefc8784013/go.mod h1:Lzz0lq20H+5z2RKaKvrYQK04hpr5Sd7DlFkRwvrSmWQ=
 github.com/filecoin-project/pubsub v1.0.0/go.mod h1:GkpB33CcUtUNrLPhJgfdy4FDx4OMNR9k+46DHx/Lqrg=
 github.com/filecoin-project/specs-actors v0.6.1/go.mod h1:dRdy3cURykh2R8O/DKqy8olScl70rmIS7GrB4hB1IDY=
 github.com/filecoin-project/specs-actors v0.9.4/go.mod h1:BStZQzx5x7TmCkLv0Bpa07U6cPKol6fd3w9KjMPZ6Z4=

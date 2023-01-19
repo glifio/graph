@@ -517,27 +517,36 @@ func AddressConvert(id string) (*model.Address, error) {
 }
 
 func CidLookup(cid string) (*gocid.Cid, *ethtypes.EthHash, error) {
-	var err error
-	var ethhash ethtypes.EthHash
-	var msgCID gocid.Cid
 
 	if strings.HasPrefix(cid, "0x") {
-		ethhash, err = ethtypes.ParseEthHash(cid[2:])
+		ethHash, err := ethtypes.ParseEthHash(cid[2:])
 		if err != nil {
-			log.Printf("eth hash err: %s\n", err)
 			return nil, nil, err
 		}
-		log.Printf("eth hash: %s\n", ethhash.String())
-		log.Printf("cid: %s\n", ethhash.ToCid().String())
-		msgCID = ethhash.ToCid()
+		msgCID, err := lotus.api.EthGetMessageCidByTransactionHash(context.Background(), &ethHash) // ethhash.ToCid()
+		if err != nil {
+			return nil, nil, err
+		}
+		if msgCID == nil {
+			err = fmt.Errorf("cid not found")
+			return nil, nil, err
+		}
+		return msgCID, &ethHash, err
 	} else {
-		msgCID, _ = gocid.Decode(cid)
+		msgCID, err := gocid.Decode(cid)
 		if err != nil {
 			return nil, nil, err
 		}
-		ethhash, _ = ethtypes.EthHashFromCid(msgCID)
+		ethHash, err := lotus.api.EthGetTransactionHashByCid(context.Background(), msgCID) // ethtypes.EthHashFromCid(msgCID)
+		if err != nil {
+			return nil, nil, err
+		}
+		if ethHash == nil {
+			err = fmt.Errorf("eth hash not found")
+			return nil, nil, err
+		}
+		return &msgCID, ethHash, err
 	}
-	return &msgCID, &ethhash, nil
 }
 
 func AddressLookup(id string) (*model.Address, error) {
